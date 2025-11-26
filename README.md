@@ -1,4 +1,4 @@
-# SKRenderer Sample
+# SKRenderer Demo
 *26 Nov 2025*
 
 This sample app demonstrates how to use SKRenderer to render and save a SpriteKit simulation to disk.
