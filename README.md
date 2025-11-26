@@ -25,22 +25,26 @@ SKRenderer works with Metal. The overall architecture of a Metal pipeline is:
 SpriteKit offline rendering with SKRenderer is that last case. Below is the boilerplate setup done once when SKRenderer is created:
 
 ```swift
-/// Get the GPU
+// Get the GPU
+
 let device = MTLCreateSystemDefaultDevice()
 
-/// Factory for creating command buffers, used later each frame
-/// Command buffers = instructions for the GPU
+// Factory for creating command buffers, used later each frame
+// Command buffers = instructions for the GPU
+
 let commandQueue = device.makeCommandQueue()
 
-/// Allocate GPU memory for the texture we'll draw into
-/// Texture = a block of GPU memory holding pixels
-/// The memory allocation stays constant (let), the pixel data changes each frame
+// Allocate GPU memory for the texture we'll draw into
+// Texture = a block of GPU memory holding pixels
+// The memory allocation stays constant (let), the pixel data changes each frame
+
 let textureDesc = MTLTextureDescriptor()
 textureDesc.width = pixelWidth
 textureDesc.height = pixelHeight
 let texture = device.makeTexture(descriptor: textureDesc)
 
-/// Create an SKRenderer instance and assign a scene to render
+// Create an SKRenderer instance and assign a scene to render
+
 let renderer = SKRenderer(device: device)
 renderer.scene = scene
 ```
@@ -48,39 +52,46 @@ renderer.scene = scene
 Then for each frame, we run code in the following form:
 
 ```swift
-/// Update scene
-/// This calls all SKScene delegate functions, from update to didFinishUpdate
+// Update scene
+// This calls all SKScene delegate functions, from update to didFinishUpdate
+
 renderer.update(atTime: currentTime)
 
-/// Configure the rendering operation for this frame
-/// Links the texture as the render target and specifies clear/store actions
+// Configure the rendering operation for this frame
+// Links the texture as the render target and specifies clear/store actions
+
 let renderPassDescriptor = MTLRenderPassDescriptor()
 renderPassDescriptor.colorAttachments[0].texture = texture
 renderPassDescriptor.colorAttachments[0].loadAction = .clear
 renderPassDescriptor.colorAttachments[0].storeAction = .store
 
-/// Create a command buffer to hold this frame's GPU instructions
+// Create a command buffer to hold this frame's GPU instructions
+
 let commandBuffer = commandQueue.makeCommandBuffer()
 
-/// Viewport is required by the API but appears ignored by SKRenderer in this context
-/// The texture dimensions determine the actual output size
+// Viewport is required by the API but appears ignored by SKRenderer in this context
+// The texture dimensions determine the actual output size
+
 let viewport = CGRect(origin: .zero, size: sceneSize)
 
-/// Render the scene into the texture
-/// SKRenderer writes drawing commands into commandBuffer
+// Render the scene into the texture
+// SKRenderer writes drawing commands into commandBuffer
+
 renderer.render(
     withViewport: viewport,
     commandBuffer: commandBuffer,
     renderPassDescriptor: renderPassDescriptor
 )
 
-/// Create a callback when GPU finishes a frame
+// Create a callback when GPU finishes a frame
+
 commandBuffer.addCompletedHandler {
     /// Convert texture to CGImage
     textureToImage(texture)
 }
 
-/// Send the command buffer to GPU for execution
+// Send the command buffer to GPU for execution
+
 commandBuffer.commit()
 ```
 
@@ -89,11 +100,13 @@ commandBuffer.commit()
 SKRenderer's `update(atTime:)` expects a system time value, not a delta time. While testing, I found that particles won't render if the time starts at 0 for the first frame. I had to initialize the start time with `CACurrentMediaTime()`, then add a delta for each frame, in order for particles to render correctly.
 
 ```swift
-/// When SKRenderer is created, grab system time
+// When SKRenderer is created, grab system time
+
 let renderer = SKRenderer(device: device)
 let startTime = CACurrentMediaTime()
 
-/// For each frame to render, pass the start time + a time offset
+// For each frame to render, pass the start time + a time offset
+
 for frame in 0..<totalFrames {
     let relativeTime = Double(frame) / fps
     let currentTime = startTime + relativeTime
@@ -108,7 +121,8 @@ A SpriteKit scene is sized in points. A Metal texture is sized in pixels. If a s
 ```swift
 let scene = SKScene(size: CGSize(width: 1920, height: 1080))
 
-/// Scale allocated texture before rendering
+// Scale allocated texture before rendering
+
 let textureDesc = MTLTextureDescriptor()
 textureDesc.width = Int(1920 * renderScale)  // @3x: 5760 pixels
 textureDesc.height = Int(1080 * renderScale)  // @3x: 3240 pixels
@@ -121,13 +135,14 @@ renderer.render(...)
 HiDPI scaling doesn't work for all nodes. SKShapeNodes with antialiasing enabled render at @1x no matter the resolution of the Metal texture descriptor, and therefore will appear blurry. A workaround is to use supersampling: create shapes upsized by the scale factor, then scale down:
 
 ```swift
-let scaleFactor: CGFloat = 3 /// iPhone scale factor
+let scaleFactor: CGFloat = 3 // iPhone scale factor
 
 let shape = SKShapeNode(rectOf: CGSize(width: 150 * scaleFactor, height: 75 * scaleFactor))
 shape.lineWidth = 3 * scaleFactor
 shape.setScale(1/scaleFactor)
 
 // Physics body must match final size, not supersampled size
+
 shape.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: 150, height: 75))
 ```
 
@@ -138,6 +153,7 @@ Textures created programmatically should be scaled to match the render scale as 
 let textureSize = CGSize(width: 2 * scaleFactor, height: 2 * scaleFactor)
 
 // Generate a texture with Core Graphics
+
 let cgRenderer = UIGraphicsImageRenderer(size: textureSize)
 let squareTexture = SKTexture(image: cgRenderer.image { context in
     SKColor.white.setFill()
@@ -152,10 +168,12 @@ With this setup, we can record a SpriteKit simulation to disk with no impact on 
 In order to record a specific interval of the simulation, the SpriteKit scene must be set up to recover a given state and replay the simulation. Typically this means having a state initialization setup + a command pattern on top of SpriteKit:
 ```swift
 // During live interaction, mutate the scene by applying commands
+
 run(Command.create(..))
 run(Command.move(..))
 
 // Replay live interaction by running stored commands
+
 history = [
     Action(time: 1.0, command: .create(...)),
     Action(time: 1.5, command: .move(...)),
