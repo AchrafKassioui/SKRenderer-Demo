@@ -11,7 +11,7 @@ import SwiftUI
 struct SKRenderer_DemoApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            SKOfflineRenderingView()
         }
     }
 }
