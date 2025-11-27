@@ -12,7 +12,7 @@ https://github.com/user-attachments/assets/0dd271a7-6df9-4ba3-bf91-d8e65a187bda
 The overall structure is as follows:
 
 - A SpriteKit scene contains all the content and behaviors.
-- The scene is supplied to SKRenderer instead of, or in addition to, being presented by SKView/SpriteView.
+- An instance of the scene is supplied to SKRenderer.
 - SKRenderer renders the SpriteKit scene into a Metal texture.
 - When GPU finishes drawing a frame, it calls back to the CPU which retrieves the Metal texture, converts it to CGImage, then encodes it as PNG.
 - Each frame can take as long as needed since we're not syncing to a display refresh rate.
