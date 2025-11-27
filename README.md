@@ -197,14 +197,18 @@ This enables capturing complex simulations at any resolution and frame rate, ful
 
 ## Determinism
 
-Interaction and behavior must be deterministic for frame-perfect replay. From empirical testing, I found the following to be deterministic:
+Interaction and behavior must be deterministic for frame-perfect replay. Consider the figure below: each render is from the same scene, and each image is the 500th frame of a 10 seconds simulation.
+
+<img src="SKRenderer-Demo/Images/SKRenderer-determinism.png" alt="SKRenderer-determinism" style="zoom:50%;" />
+
+From empirical testing, I found the following to be deterministic:
 
 - SKActions and typical code written in update
-- Particles, including behavior under physics fields like turbulence, seem to behave predictably from run to run. This was positively surprising! Mind you, we can't "teleport" particles into any arbitrary state. If the current state of a particle emitter is the result of an interaction with a field, the simulation must be replayed from the first interaction in order to recover the current state. 
+- Physics fields effects on particles, like turbulence, appear predictable, which was a pleasant surprise! The particles themselves aren't identical from run to run, but the overall behavior is repeatable. Mind you, we can't "teleport" particles into a particular state. If the current state of a particle emitter is the result of an interaction with a field, the simulation must be replayed from the first interaction in order to recover the current state. 
 
 I found the following to not be deterministic, despite the fixed time step of the renderer:
 
-- Colliding physics bodies. In the code sample, repeated renders show bouncing balls in different positions at similar times.
+- Colliding physics bodies. We can see that the bouncing balls above are in different positions at similar simulation time.
 
 If your setup depends on precise physics body positions interacting over multiple seconds, use guide rails to direct the behavior, such as careful level design and checkpoints.
 
@@ -244,7 +248,7 @@ The app demonstrates:
 - Complete Metal rendering setup
 - SKShapeNode supersampling workaround
 - Async/await pattern for GPU callbacks
-- Parallel disk saving for performance
+- Parallel disk saving
 - Support for CoreImage filters
 - Resolution and scale factor configuration
 
