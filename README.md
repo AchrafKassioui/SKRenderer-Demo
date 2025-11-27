@@ -9,20 +9,20 @@ The overall structure is as follows:
 
 - A SpriteKit scene contains all the content and behaviors.
 - The scene is supplied to SKRenderer instead of, or in addition to, being presented by SKView/SpriteView.
-- SKRenderer renders frames from the SpriteKit scene into a Metal texture.
+- SKRenderer renders the SpriteKit scene into a Metal texture.
 - When GPU finishes drawing a frame, it calls back to the CPU which retrieves the Metal texture, converts it to CGImage, then encodes it as PNG.
 - Each frame can take as long as needed since we're not syncing to a display refresh rate.
 - Images are stored to disk in a folder inside the app container. The full path is printed to console for retrieval.
 
 ## Rendering Setup
 
-SKRenderer works with Metal. The overall architecture of a Metal pipeline is:
+SKRenderer works with Metal. The high level architecture of a Metal pipeline is:
 
-- A Metal renderer draws into a texture in GPU memory.
-- In the case of a view backed by Metal, the view provides its own texture and presents it on screen, usually with a display link.
-- In the case of a setup that needs to retrieve the content of the rendering, we will allocate a Metal texture (a block in GPU memory), and use the content when GPU finishes.
+- A Metal renderer draws into a texture, where a texture is a block of memory on the GPU.
+- If the renderer is tied to a view, the view supplies the texture and presents it to the display each frame, synchronized with the screen's refresh rate.
+- If the renderer runs offscreen, the app itself allocates a texture in GPU memory, and retrieves its contents once the GPU finishes rendering.
 
-SpriteKit offline rendering with SKRenderer is that last case. Below is the boilerplate setup done once when SKRenderer is created:
+SpriteKit’s offline rendering with SKRenderer uses this last mode. Below is the boilerplate setup done **once** when SKRenderer is created:
 
 ```swift
 // Get the GPU
@@ -34,14 +34,14 @@ let device = MTLCreateSystemDefaultDevice()
 
 let commandQueue = device.makeCommandQueue()
 
-// Allocate GPU memory for the texture we'll draw into
+// Allocate GPU memory for the texture we'll render into
 // Texture = a block of GPU memory holding pixels
 // The memory allocation stays constant (let), the pixel data changes each frame
 
 let textureDesc = MTLTextureDescriptor()
 textureDesc.width = pixelWidth
 textureDesc.height = pixelHeight
-let texture = device.makeTexture(descriptor: textureDesc)
+let renderTexture = device.makeTexture(descriptor: textureDesc)
 
 // Create an SKRenderer instance and assign a scene to render
 
@@ -49,7 +49,7 @@ let renderer = SKRenderer(device: device)
 renderer.scene = scene
 ```
 
-Then for each frame, we run code in the following form:
+Then for **each frame**, we run code in the following form:
 
 ```swift
 // Update scene
@@ -61,7 +61,7 @@ renderer.update(atTime: currentTime)
 // Links the texture as the render target and specifies clear/store actions
 
 let renderPassDescriptor = MTLRenderPassDescriptor()
-renderPassDescriptor.colorAttachments[0].texture = texture
+renderPassDescriptor.colorAttachments[0].texture = renderTexture
 renderPassDescriptor.colorAttachments[0].loadAction = .clear
 renderPassDescriptor.colorAttachments[0].storeAction = .store
 
@@ -87,7 +87,7 @@ renderer.render(
 
 commandBuffer.addCompletedHandler {
     /// Convert texture to CGImage
-    textureToImage(texture)
+    textureToImage(renderTexture)
 }
 
 // Send the command buffer to GPU for execution
@@ -163,16 +163,16 @@ let squareTexture = SKTexture(image: cgRenderer.image { context in
 
 ## Use Case: Recording Live Simulations
 
-With this setup, we can record a SpriteKit simulation to disk with no impact on framerate, and with possibilities like applying costly image filters and additional processing.
+This setup lets you record a SpriteKit simulation to disk without affecting real-time performance, and makes it possible to apply expensive post-processing offline: filters, compositing, analysis, etc.
 
-In order to record a specific interval of the simulation, the SpriteKit scene must be set up to recover a given state and replay the simulation. Typically this means having a state initialization setup + a command pattern on top of SpriteKit:
+In order to record a specific segment of the simulation, the SpriteKit scene must be set up to recover a given state and replay the simulation. Typically this means having a deterministic state initializer + a command pattern on top of SpriteKit:
 ```swift
-// During live interaction, mutate the scene by applying commands
+// Live interaction mutates the scene by issuing commands:
 
 run(Command.create(..))
 run(Command.move(..))
 
-// Replay live interaction by running stored commands
+// The same interaction can be reproduced later:
 
 history = [
     Action(time: 1.0, command: .create(...)),
@@ -181,15 +181,15 @@ history = [
 ]
 ```
 
-A recording session would be implemented like this:
+A recording pass would be implemented like this:
 
-- Initialize scene into a particular state (nodes, transforms, assets)
-- Start update loop
-- Each frame, run recorded commands at their specific timestamps. Systems translate commands into scene mutations
-- SKRenderer renders the frame
-- Frame is stored on disk
+- Reset the scene to the desired initial state (nodes, transforms, assets…)
+- Start the update loop
+- At each frame, replay any commands scheduled for that timestamp
+- Let SKRenderer render as many frames as needed for the interval
+- Save each rendered frame to disk
 
-This allows recording complex simulations at arbitrary resolution and frame rates, independently from real-time display constraints. Further setup using AVFoundation can create a video from the sequence of rendered frames.
+This enables capturing complex simulations at any resolution and frame rate, fully decoupled from real-time display limits. The resulting frame sequence can then be assembled into a video using AVFoundation.
 
 ## Determinism
 
@@ -206,33 +206,30 @@ If your setup depends on precise physics body positions interacting over multipl
 
 ## Performance
 
-Example output from rendering 60 frames (1 seconds at 60fps) at @3x on an iPhone 13 (A15 chip):
+Example output from rendering 600 frames (10 seconds at 60fps) at @2x on an iPhone 13 (A15 chip):
 ```
 ========================================
-RENDERING TO: /Documents/SKRender_2025-11-26_15-48-22
+RENDERING TO: /Documents/SKRender_2025-11-27_16-49-48
 Resolution: 390×844 points
 Node count: 11
-Scale: @3x
-Actual pixels: 1170×2532
+Scale: @2x
+Actual pixels: 780×1688
 FPS: 60
-Frames: 60
+Frames: 600
 Filter: None
 ========================================
 
-Rendered frame 1/60
-Rendered frame 11/60
-Rendered frame 21/60
-Rendered frame 31/60
-Rendered frame 41/60
-Rendered frame 51/60
+.
+..
+...
 
 ========================================
 RENDER COMPLETE
-Location: /Documents/SKRender_2025-11-26_15-48-22
-Frames: 60
-Rendering time: 1.05s (0.017s/frame)
-Saving time: 0.03s
-Total time: 1.08s (0.018s/frame)
+Location: /Documents/SKRender_2025-11-27_16-49-48
+Frames: 600
+Rendering time: 6.04s (0.010s/frame)
+Saving time: 0.02s
+Total time: 6.06s (0.010s/frame)
 ========================================
 ```
 
