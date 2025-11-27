@@ -3,6 +3,10 @@
 
 This sample app demonstrates how to use SKRenderer to render and save a SpriteKit simulation to disk.
 
+## Demo
+
+https://github.com/user-attachments/assets/0dd271a7-6df9-4ba3-bf91-d8e65a187bda
+
 ## Overview
 
 The overall structure is as follows:
