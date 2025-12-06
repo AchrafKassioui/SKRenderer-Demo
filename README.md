@@ -26,7 +26,7 @@ SKRenderer outputs a metal texture which can be used in a Metal pipeline:
 - Some native views such as ARView can integrate their own render texture with another Metal texture such as the one drawn by SKRenderer. See ARView [RenderCallbacks](https://developer.apple.com/documentation/realitykit/arview/rendercallbacks-swift.struct) and [postProcess](https://developer.apple.com/documentation/realitykit/arview/rendercallbacks-swift.struct/postprocess).
 - SKRenderer can run offscreen, without a view attached to it. The app using SKRenderer is responsible for updating SKRenderer and requesting a render.
 
-SpriteKit’s offline rendering with SKRenderer uses this last path. Below is the boilerplate setup done **once** when SKRenderer is created:
+SpriteKit offline rendering with SKRenderer uses this last path. Below is the boilerplate setup done **once** when SKRenderer is created:
 
 ```swift
 // Get the GPU
