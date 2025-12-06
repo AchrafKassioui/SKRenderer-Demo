@@ -14,19 +14,19 @@ The overall structure is as follows:
 - A SpriteKit scene contains all the content and behaviors.
 - An instance of the scene is supplied to SKRenderer.
 - SKRenderer renders the SpriteKit scene into a Metal texture.
-- When GPU finishes drawing a frame, it calls back to the CPU which retrieves the Metal texture, converts it to CGImage, then encodes it as PNG.
+- When GPU finishes drawing a frame, a completion handler calls the CPU, which copies the Metal texture, converts it to CGImage, then encodes it as PNG and saves it to disc.
 - Each frame can take as long as needed since we're not syncing to a display refresh rate.
 - Images are stored to disk in a folder inside the app container. The full path is printed to console for retrieval.
 
 ## Rendering Setup
 
-SKRenderer works with Metal. The high level architecture of a Metal pipeline is:
+SKRenderer outputs a metal texture which can be used in a Metal pipeline:
 
-- A Metal renderer draws into a texture, where a texture is a block of memory on the GPU.
-- If the renderer is tied to a view, the view supplies the texture and presents it to the display each frame, synchronized with the screen's refresh rate.
-- If the renderer runs offscreen, the app itself allocates a texture in GPU memory, and retrieves its contents once the GPU finishes rendering.
+- A metal view can use the result of SKRenderer and display it on screen. The view would synchronize with the screen refresh rate, and ask SKRenderer for an update and render each cycle.
+- Some native views such as ARView can integrate their own render texture with another Metal texture such as the one drawn by SKRenderer. See ARView [RenderCallbacks](https://developer.apple.com/documentation/realitykit/arview/rendercallbacks-swift.struct) and [postProcess](https://developer.apple.com/documentation/realitykit/arview/rendercallbacks-swift.struct/postprocess).
+- SKRenderer can run offscreen, without a view attached to it. The app using SKRenderer is responsible for updating SKRenderer and requesting a render.
 
-SpriteKit’s offline rendering with SKRenderer uses this last mode. Below is the boilerplate setup done **once** when SKRenderer is created:
+SpriteKit’s offline rendering with SKRenderer uses this last path. Below is the boilerplate setup done **once** when SKRenderer is created:
 
 ```swift
 // Get the GPU
@@ -62,7 +62,7 @@ Then for **each frame**, we run code in the following form:
 renderer.update(atTime: currentTime)
 
 // Configure the rendering operation for this frame
-// Links the texture as the render target and specifies clear/store actions
+// Set the created texture as the render target and specifies clear/store actions
 
 let renderPassDescriptor = MTLRenderPassDescriptor()
 renderPassDescriptor.colorAttachments[0].texture = renderTexture
@@ -90,7 +90,7 @@ renderer.render(
 // Create a callback when GPU finishes a frame
 
 commandBuffer.addCompletedHandler {
-    /// Convert texture to CGImage
+    /// Custom function that converts a texture into an image
     textureToImage(renderTexture)
 }
 
@@ -120,7 +120,7 @@ for frame in 0..<totalFrames {
 
 ## Resolution and Scale Factor
 
-A SpriteKit scene is sized in points. A Metal texture is sized in pixels. If a scene is created at 1920x1080 and SKRenderer draws it, the output will be 1920x1080 pixels. In order to get Retina resolution, we must multiply **the size of the allocated texture by a scale factor**. Metal will handle the mapping between the point-based scene and the pixel-based texture. This is reminiscent of a UIView [contentScaleFactor](https://developer.apple.com/documentation/uikit/uiview/contentscalefactor) property.
+A SpriteKit scene is sized in points. A Metal texture is sized in pixels. If a scene is created at 1920x1080 and SKRenderer draws it, the output will be 1920x1080 pixels. In order to get Retina resolution, we must multiply **the size of the allocated texture by a scale factor**. SKRenderer will handle the mapping between the point-based scene and the pixel-based texture. This is reminiscent of a UIView [contentScaleFactor](https://developer.apple.com/documentation/uikit/uiview/contentscalefactor) property.
 
 ```swift
 let scene = SKScene(size: CGSize(width: 1920, height: 1080))
@@ -152,7 +152,7 @@ shape.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: 150, height: 75))
 
 An alternative is to set `isAntialiased = false` on shape nodes, which will force SKRenderer to draw them at the correct resolution, but curves will appear jagged.
 
-Textures created programmatically should be scaled to match the render scale as well. Pass the scale factor to the scene initializer and scale texture creation accordingly:
+Textures created programmatically should be scaled to match the render scale as well. Pass the scale factor to the generator and scale texture creation accordingly:
 ```swift
 let textureSize = CGSize(width: 2 * scaleFactor, height: 2 * scaleFactor)
 
@@ -246,10 +246,8 @@ Total time: 6.06s (0.010s/frame)
 The app demonstrates:
 
 - Complete Metal rendering setup
-- SKShapeNode supersampling workaround
-- Async/await pattern for GPU callbacks
-- Parallel disk saving
+- SKRenderer scale factor configuration and SKShapeNode supersampling workaround
+- Async/await and error handling patterns
 - Support for CoreImage filters
-- Resolution and scale factor configuration
 
 Use this as a foundation for building replay systems, automated testing, or video export features in SpriteKit projects.

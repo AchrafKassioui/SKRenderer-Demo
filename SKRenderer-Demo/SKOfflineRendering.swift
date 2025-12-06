@@ -6,7 +6,7 @@
  
  Achraf Kassioui
  Created 20 Nov 2025
- Updated 26 Nov 2025
+ Updated 6 Dec 2025
  
  */
 import SpriteKit
@@ -425,8 +425,8 @@ class SKRenderController {
                 currentFrame = frame + 1
                 currentTime += deltaTime
                 
-                /// Render frame on GPU (async because Metal is asynchronous)
-                let image = try await offlineRenderer.renderFrame(atTime: currentTime)
+                /// Get CGImage for this frame
+                let cgImage = try await offlineRenderer.renderFrame(atTime: currentTime)
                 
                 /// Save to disk on background thread (non-blocking)
                 let saveTask = Task {
@@ -436,7 +436,7 @@ class SKRenderController {
                             let fileURL = outputDir.appendingPathComponent(filename)
                             
                             do {
-                                try self.saveImage(image, to: fileURL)
+                                try self.saveImage(cgImage, to: fileURL)
                             } catch {
                                 print("Failed to save frame \(frame): \(error)")
                             }
@@ -444,8 +444,13 @@ class SKRenderController {
                             DispatchQueue.main.async {
                                 self.progress = Double(frame + 1) / Double(self.totalFrames)
                                 
-                                if frame % 10 == 0 {
-                                    print("Rendered frame \(frame + 1)/\(self.totalFrames)")
+                                /// Print dot without newline; flush forces immediate display instead of buffering
+                                print(".", terminator: "")
+                                fflush(stdout)
+                                
+                                if frame % 60 == 0 && frame != 0{
+                                    /// Print every 60 frames
+                                    print(" \(frame + 1)/\(self.totalFrames)")
                                 }
                                 
                                 continuation.resume()
@@ -546,6 +551,7 @@ class SKOfflineRenderer {
         let pixelWidth = Int(size.width * renderScale)
         let pixelHeight = Int(size.height * renderScale)
         
+        /// Create render texture
         let textureDesc = MTLTextureDescriptor()
         textureDesc.pixelFormat = .bgra8Unorm
         textureDesc.width = pixelWidth
@@ -559,7 +565,7 @@ class SKOfflineRenderer {
         
         /// Create SKRenderer and scene
         /// Scene size is in points
-        /// Metal automatically maps viewport (points) to texture (pixels) at the correct scale
+        /// SKRenderer automatically maps viewport (points) to texture (pixels) at the correct scale
         renderer = SKRenderer(device: device)
         let scene = SKRenderScene(size: size, scaleFactor: renderScale, filter: filter)
         renderer.scene = scene
@@ -604,6 +610,7 @@ class SKOfflineRenderer {
             )
             
             /// addCompletedHandler is called when GPU work is done for this frame
+            /// renderTexture is now ready
             commandBuffer.addCompletedHandler { [weak self] _ in
                 guard let self = self else {
                     continuation.resume(throwing: RenderError.rendererDeallocated)
@@ -611,9 +618,9 @@ class SKOfflineRenderer {
                 }
                 
                 do {
-                    /// Convert texture to CGImage when GPU finishes
-                    let image = try self.textureToImage(self.renderTexture)
-                    continuation.resume(returning: image)
+                    /// Convert texture to CGImage
+                    let cgImage = try convertToCGImage(renderTexture)
+                    continuation.resume(returning: cgImage)
                 } catch {
                     continuation.resume(throwing: error)
                 }
@@ -621,19 +628,18 @@ class SKOfflineRenderer {
             
             /// Submit command buffer to GPU
             /// commit() sends all queued commands to the GPU for execution
-            /// After this, the GPU works asynchronously while CPU continues
             commandBuffer.commit()
         }
     }
     
-    /// Converts Metal texture to CGImage by copying pixels from GPU to CPU
-    private func textureToImage(_ texture: MTLTexture) throws -> CGImage {
+    private func convertToCGImage(_ texture: MTLTexture) throws -> CGImage {
         let width = texture.width
         let height = texture.height
         let bytesPerPixel = 4
         let rowBytes = width * bytesPerPixel
         
-        /// Copy pixel data from GPU memory to CPU memory
+        /// Copy pixel data from Metal texture
+        /// This could be made faster by using IOSurface to back the render texture
         var pixelData = [UInt8](repeating: 0, count: height * rowBytes)
         texture.getBytes(
             &pixelData,
@@ -641,9 +647,7 @@ class SKOfflineRenderer {
             from: MTLRegionMake2D(0, 0, width, height),
             mipmapLevel: 0
         )
-        
-        /// Data(pixelData) creates a copy. For high-performance production code,
-        /// consider using pixelData.withUnsafeMutableBytes to avoid the extra allocation
+
         guard let dataProvider = CGDataProvider(data: Data(pixelData) as CFData) else {
             throw RenderError.failedToCreateDataProvider
         }
