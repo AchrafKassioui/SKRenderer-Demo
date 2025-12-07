@@ -7,26 +7,36 @@ This sample app demonstrates how to use SKRenderer to render and save a SpriteKi
 
 https://github.com/user-attachments/assets/0dd271a7-6df9-4ba3-bf91-d8e65a187bda
 
-## Overview
+## SKRenderer Overview
+
+SKRenderer takes a SpriteKit scene and outputs a metal texture. The texture can be used in a Metal pipeline:
+
+- A Metal-backed view can display the output texture on screen, calling update and render each frame in sync with the display refresh rate.
+- Views such as ARView can composite their own render texture with the one produced by SKRenderer. See ARView [RenderCallbacks](https://developer.apple.com/documentation/realitykit/arview/rendercallbacks-swift.struct) and [postProcess](https://developer.apple.com/documentation/realitykit/arview/rendercallbacks-swift.struct/postprocess).
+- SKRenderer can run offscreen, with no view attached. In this mode, the app itself drives the update/render loop and retrieves the texture. This demo uses that approach.
+
+What SKRenderer is not:
+
+- SKRenderer does not expose SKView internals such as its framebuffer. SKView and SKRenderer are separate rendering paths.
+- SKRenderer is not magic. It's a renderer that needs the scene to be updated and computed at regular intervals. RealityKit and SceneKit can integrate SpriteKit content via SKRenderer, but only if the SpriteKit scene can update and render within the available frame budget. In practice, SpriteKit is light enough for this to work well.
+
+## App Structure
+
+<img src="SKRenderer-Demo/Images/SKRenderer-Demo-Screenshot.png" alt="SKRenderer-Demo-Screenshot" style="width:33%;" />
 
 The overall structure is as follows:
 
 - A SpriteKit scene contains all the content and behaviors.
-- An instance of the scene is supplied to SKRenderer.
-- SKRenderer renders the SpriteKit scene into a Metal texture.
-- When GPU finishes drawing a frame, a completion handler calls the CPU, which copies the Metal texture, converts it to CGImage, then encodes it as PNG and saves it to disc.
+- One instance of the scene is given to SpriteView (SKView) for live preview.
+- When the user presses Render, a fresh instance of the scene is passed to SKRenderer.
+- SKRenderer runs the scene and renders each frame into a Metal texture.
+- When the GPU finishes a draw, a completion handler fires on the CPU: it copies the Metal texture, converts it to a CGImage, encodes it as PNG, and writes it to disk.
 - Each frame can take as long as needed since we're not syncing to a display refresh rate.
-- Images are stored to disk in a folder inside the app container. The full path is printed to console for retrieval.
+- The PNGs are saved into a folder inside the app container. The full path is printed to console for retrieval.
 
-## Rendering Setup
+## SKRenderer Setup
 
-SKRenderer outputs a metal texture which can be used in a Metal pipeline:
-
-- A metal view can use the result of SKRenderer and display it on screen. The view would synchronize with the screen refresh rate, and ask SKRenderer for an update and render each cycle.
-- Some native views such as ARView can integrate their own render texture with another Metal texture such as the one drawn by SKRenderer. See ARView [RenderCallbacks](https://developer.apple.com/documentation/realitykit/arview/rendercallbacks-swift.struct) and [postProcess](https://developer.apple.com/documentation/realitykit/arview/rendercallbacks-swift.struct/postprocess).
-- SKRenderer can run offscreen, without a view attached to it. The app using SKRenderer is responsible for updating SKRenderer and requesting a render.
-
-SpriteKit offline rendering with SKRenderer uses this last path. Below is the boilerplate setup done **once** when SKRenderer is created:
+Below is the boilerplate setup done **once** when SKRenderer is created:
 
 ```swift
 // Get the GPU
