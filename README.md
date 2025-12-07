@@ -209,7 +209,7 @@ This enables capturing complex simulations at any resolution and frame rate, ful
 
 Interaction and behavior must be deterministic for frame-perfect replay. Consider the figure below: each render is from the same scene, and each image is the 500th frame of a 10 seconds simulation.
 
-<img src="SKRenderer-Demo/Images/SKRenderer-determinism.png" alt="SKRenderer-determinism" style="zoom:50%;" />
+<img src="SKRenderer-Demo/Images/SKRenderer-determinism.png" alt="SKRenderer-determinism" style="width:50%;" />
 
 From empirical testing, I found the following to be deterministic:
 
