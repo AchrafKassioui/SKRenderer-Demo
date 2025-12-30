@@ -6,7 +6,7 @@
  
  Achraf Kassioui
  Created 20 Nov 2025
- Updated 6 Dec 2025
+ Updated 30 Dec 2025
  
  */
 import SpriteKit
@@ -43,6 +43,8 @@ struct SKOfflineRenderingView: View {
             }
         }
     }
+    
+    // MARK: Filters
     
     enum CoreImageFilter: String, CaseIterable, Identifiable {
         case none = "No Filter"
@@ -83,16 +85,26 @@ struct SKOfflineRenderingView: View {
         }
     }
     
+    // MARK: SpriteView
+    
     var body: some View {
         GeometryReader { fullGeo in
             ZStack(alignment: .bottom) {
-                /// Live preview
-                if let scene = liveScene {
-                    SpriteView(scene: scene, debugOptions: [.showsFPS, .showsNodeCount])
+                if !controller.isRendering {
+                    /// Live preview
+                    if let scene = liveScene {
+                        SpriteView(
+                            scene: scene,
+                            debugOptions: [.showsFPS, .showsNodeCount]
+                        )
+                    }
                 }
                 
-                /// Controls overlay
+                // MARK: UI
+                
                 VStack() {
+                    Spacer()
+                    
                     if controller.isRendering {
                         VStack(spacing: 8) {
                             ProgressView(value: controller.progress)
@@ -106,6 +118,7 @@ struct SKOfflineRenderingView: View {
                         VStack(alignment: .leading) {
                             
                             /// # Duration
+                            
                             HStack {
                                 Text("Duration")
                                     .foregroundStyle(.white)
@@ -117,6 +130,7 @@ struct SKOfflineRenderingView: View {
                             }
                             
                             /// # Resolution
+                            
                             HStack {
                                 Text("Resolution")
                                     .foregroundStyle(.white)
@@ -136,6 +150,7 @@ struct SKOfflineRenderingView: View {
                             }
                             
                             /// # Scale
+                            
                             HStack {
                                 Text("Scale")
                                     .foregroundStyle(.white)
@@ -149,6 +164,7 @@ struct SKOfflineRenderingView: View {
                             }
                             
                             /// # Filter
+                            
                             HStack {
                                 Text("Filter")
                                     .foregroundStyle(.white)
@@ -166,6 +182,7 @@ struct SKOfflineRenderingView: View {
                                 .background(.white.opacity(0.3))
                             
                             /// # Render button
+                            
                             Button {
                                 Task {
                                     await controller.renderSequence(
@@ -220,6 +237,9 @@ struct SKOfflineRenderingView: View {
 
 class SKRenderScene: SKScene, SKPhysicsContactDelegate {
     
+    var deltaTime: TimeInterval = 0
+    private var lastUpdateTime: TimeInterval = 0
+
     let scaleFactor: CGFloat
     var feedback = UIImpactFeedbackGenerator()
     
@@ -235,6 +255,8 @@ class SKRenderScene: SKScene, SKPhysicsContactDelegate {
         static let none = BitMasks([])
         static let all = BitMasks(rawValue: UInt32.max)
     }
+    
+    // MARK: Init
     
     /// Setup must be done in `init` or `sceneDidLoad` since SKRenderer doesn't call `didMove(to view)`
     init(size: CGSize, scaleFactor: CGFloat, filter: CIFilter?) {
@@ -254,11 +276,23 @@ class SKRenderScene: SKScene, SKPhysicsContactDelegate {
         }
         
         createContent()
+        
+        /// Control when bouncing balls are created, for physics determinism tests
+        let sequence1 = SKAction.sequence([
+            .wait(forDuration: 0.5),
+            .run { [weak self] in
+                self?.createBouncingBalls()
+            }
+        ])
+        
+        run(sequence1)
     }
     
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
+    
+    // MARK: didMove
     
     override func didMove(to view: SKView) {
         /// Better looking during device orientation change
@@ -268,6 +302,36 @@ class SKRenderScene: SKScene, SKPhysicsContactDelegate {
         
         feedback = UIImpactFeedbackGenerator(view: view)
         feedback.prepare()
+    }
+    
+    // MARK: Content
+    
+    private func createBouncingBalls() {
+        /// Bouncing balls
+        /// Test physics determinsim. Collisions and friction stress test physics predictability run after run
+        let circleCount = 5
+        let spacing: CGFloat = 60
+        let totalWidth = CGFloat(circleCount - 1) * spacing
+        let startX = -totalWidth / 2
+        
+        for i in 0..<circleCount {
+            let circle = SKShapeNode(circleOfRadius: 18 * scaleFactor)
+            circle.fillColor = .orange
+            circle.lineWidth = 2 * scaleFactor
+            circle.strokeColor = .black
+            circle.setScale(1/scaleFactor)
+            
+            circle.physicsBody = SKPhysicsBody(circleOfRadius: 18)
+            circle.physicsBody?.collisionBitMask = BitMasks.cat1.rawValue
+            circle.physicsBody?.contactTestBitMask = BitMasks.cat1.rawValue
+            circle.physicsBody?.fieldBitMask = BitMasks.cat1.rawValue
+            /// Toggle these lines to test determinism
+            //circle.physicsBody?.restitution = 1
+            //circle.physicsBody?.linearDamping = 0
+            let x = startX + CGFloat(i) * spacing
+            circle.position = CGPoint(x: x, y: 150)
+            addChild(circle)
+        }
     }
     
     private func createContent() {
@@ -298,30 +362,6 @@ class SKRenderScene: SKScene, SKPhysicsContactDelegate {
         ground.physicsBody?.collisionBitMask = BitMasks.cat1.rawValue
         ground.position = CGPoint(x: 0, y: -100)
         addChild(ground)
-        
-        /// Bouncing balls
-        /// Test physics determinsim. Collisions and friction stress test physics predictability run after run
-        let circleCount = 5
-        let spacing: CGFloat = 60
-        let totalWidth = CGFloat(circleCount - 1) * spacing
-        let startX = -totalWidth / 2
-        
-        for i in 0..<circleCount {
-            let circle = SKShapeNode(circleOfRadius: 18 * scaleFactor)
-            circle.fillColor = .orange
-            circle.lineWidth = 2 * scaleFactor
-            circle.strokeColor = .black
-            circle.setScale(1/scaleFactor)
-            
-            circle.physicsBody = SKPhysicsBody(circleOfRadius: 18)
-            circle.physicsBody?.collisionBitMask = BitMasks.cat1.rawValue
-            circle.physicsBody?.contactTestBitMask = BitMasks.cat1.rawValue
-            circle.physicsBody?.fieldBitMask = BitMasks.cat1.rawValue
-            circle.physicsBody?.restitution = 1
-            let x = startX + CGFloat(i) * spacing
-            circle.position = CGPoint(x: x, y: 150)
-            addChild(circle)
-        }
         
         /// Text node
         let label = SKLabelNode(text: "SKRenderer")
@@ -367,9 +407,31 @@ class SKRenderScene: SKScene, SKPhysicsContactDelegate {
         addChild(field)
     }
     
+    // MARK: Physics Contacts
+    
     func didBegin(_ contact: SKPhysicsContact) {
         feedback.impactOccurred(intensity: 0.5)
     }
+    
+    // MARK: Loop
+    
+    override func update(_ currentTime: TimeInterval) {
+        /// First frame, initialize delta time
+        if lastUpdateTime == 0 {
+            lastUpdateTime = currentTime
+        }
+        
+        /// Calculate delta time
+        deltaTime = currentTime - lastUpdateTime
+        
+        /// Store for next frame
+        lastUpdateTime = currentTime
+        
+        /// During offline rendering, even if we supply a fixed timestep, we get alternating
+        /// delta time values because we are adding 1/60 each time (floating point precision)
+        //print(deltaTime)
+    }
+    
 }
 
 // MARK: Controller
@@ -382,6 +444,8 @@ class SKRenderController {
     var currentFrame = 0
     var totalFrames = 0
     var message: String?
+    
+    // MARK: Render Sequence
     
     func renderSequence(duration: Double, size: CGSize, renderScale: CGFloat, fps: Double, filter: CIFilter?) async {
         isRendering = true
@@ -494,6 +558,8 @@ class SKRenderController {
         isRendering = false
     }
     
+    // MARK: Files
+    
     private func createOutputDirectory() throws -> URL {
         let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let formatter = DateFormatter()
@@ -512,6 +578,8 @@ class SKRenderController {
         try pngData.write(to: url)
     }
     
+    // MARK: Helpers
+    
     private func countAllNodes(in node: SKNode) -> Int {
         return 1 + node.children.reduce(0) { $0 + countAllNodes(in: $1) }
     }
@@ -528,6 +596,8 @@ class SKOfflineRenderer {
     private let sceneSize: CGSize
     private let backgroundColor: MTLClearColor
     private let startTime: TimeInterval
+    
+    // MARK: Init
     
     init(size: CGSize, renderScale: CGFloat, filter: CIFilter?) throws {
         /// Scene size in points
@@ -577,6 +647,8 @@ class SKOfflineRenderer {
         /// Without this, particles are not rendered
         self.startTime = CACurrentMediaTime()
     }
+    
+    // MARK: Render Frame
     
     /// Renders one frame at the specified time
     func renderFrame(atTime time: TimeInterval) async throws -> CGImage {
@@ -631,6 +703,8 @@ class SKOfflineRenderer {
             commandBuffer.commit()
         }
     }
+    
+    // MARK: Encode Image
     
     private func convertToCGImage(_ texture: MTLTexture) throws -> CGImage {
         let width = texture.width
