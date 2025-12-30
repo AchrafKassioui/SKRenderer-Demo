@@ -429,7 +429,17 @@ class SKRenderScene: SKScene, SKPhysicsContactDelegate {
         
         /// During offline rendering, even if we supply a fixed timestep, we get alternating
         /// delta time values because we are adding 1/60 each time (floating point precision)
-        //print(deltaTime)
+        print(deltaTime)
+        /*
+         0.016666666720993817
+         0.016666666604578495
+         0.016666666720993817
+         0.016666666604578495
+         0.016666666720993817
+         0.016666666720993817
+         0.016666666604578495
+         0.016666666720993817
+         */
     }
     
 }
