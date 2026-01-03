@@ -6,14 +6,14 @@
  
  Achraf Kassioui
  Created 20 Nov 2025
- Updated 30 Dec 2025
+ Updated 3 Jan 2026
  
  */
 import SpriteKit
 import SwiftUI
 import CoreImage.CIFilterBuiltins
 
-// MARK: View
+// MARK: - View
 
 struct SKOfflineRenderingView: View {
     @State private var liveScene: SKRenderScene?
@@ -233,218 +233,7 @@ struct SKOfflineRenderingView: View {
     SKOfflineRenderingView()
 }
 
-// MARK: Scene
-
-class SKRenderScene: SKScene, SKPhysicsContactDelegate {
-    
-    var deltaTime: TimeInterval = 0
-    private var lastUpdateTime: TimeInterval = 0
-
-    let scaleFactor: CGFloat
-    var feedback = UIImpactFeedbackGenerator()
-    
-    struct BitMasks: OptionSet {
-        let rawValue: UInt32
-        
-        static let cat1 = BitMasks(rawValue: 1 << 0)
-        static let cat2 = BitMasks(rawValue: 1 << 1)
-        static let cat3 = BitMasks(rawValue: 1 << 2)
-        static let cat4 = BitMasks(rawValue: 1 << 3)
-        static let cat5 = BitMasks(rawValue: 1 << 4)
-        
-        static let none = BitMasks([])
-        static let all = BitMasks(rawValue: UInt32.max)
-    }
-    
-    // MARK: Init
-    
-    /// Setup must be done in `init` or `sceneDidLoad` since SKRenderer doesn't call `didMove(to view)`
-    init(size: CGSize, scaleFactor: CGFloat, filter: CIFilter?) {
-        self.scaleFactor = scaleFactor
-        
-        super.init(size: size)
-        
-        self.scaleMode = .aspectFit
-        self.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-        self.backgroundColor = .darkGray
-        self.physicsWorld.contactDelegate = self
-        
-        /// Apply CoreImage filter if provided
-        if let filter = filter {
-            self.shouldEnableEffects = true
-            self.filter = filter
-        }
-        
-        createContent()
-        
-        /// Control when bouncing balls are created, for physics determinism tests
-        let sequence1 = SKAction.sequence([
-            .wait(forDuration: 0.5),
-            .run { [weak self] in
-                self?.createBouncingBalls()
-            }
-        ])
-        
-        run(sequence1)
-    }
-    
-    required init?(coder aDecoder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
-    // MARK: didMove
-    
-    override func didMove(to view: SKView) {
-        /// Better looking during device orientation change
-        view.contentMode = .center
-        /// When presented by SKView, we want the scene to fill the screen
-        scaleMode = .resizeFill
-        
-        feedback = UIImpactFeedbackGenerator(view: view)
-        feedback.prepare()
-    }
-    
-    // MARK: Content
-    
-    private func createBouncingBalls() {
-        /// Bouncing balls
-        /// Test physics determinsim. Collisions and friction stress test physics predictability run after run
-        let circleCount = 5
-        let spacing: CGFloat = 60
-        let totalWidth = CGFloat(circleCount - 1) * spacing
-        let startX = -totalWidth / 2
-        
-        for i in 0..<circleCount {
-            let circle = SKShapeNode(circleOfRadius: 18 * scaleFactor)
-            circle.fillColor = .orange
-            circle.lineWidth = 2 * scaleFactor
-            circle.strokeColor = .black
-            circle.setScale(1/scaleFactor)
-            
-            circle.physicsBody = SKPhysicsBody(circleOfRadius: 18)
-            circle.physicsBody?.collisionBitMask = BitMasks.cat1.rawValue
-            circle.physicsBody?.contactTestBitMask = BitMasks.cat1.rawValue
-            circle.physicsBody?.fieldBitMask = BitMasks.cat1.rawValue
-            /// Toggle these lines to test determinism
-            //circle.physicsBody?.restitution = 1
-            //circle.physicsBody?.linearDamping = 0
-            let x = startX + CGFloat(i) * spacing
-            circle.position = CGPoint(x: x, y: 150)
-            addChild(circle)
-        }
-    }
-    
-    private func createContent() {
-        /// SKShapeNodes with antialiasing render blurry when output resolution is more than @1x (but render sharp in SKView)
-        /// Solution: supersampling. Create shapes at @x size, then scale down by @x
-        let roundedRectangle = SKShapeNode(rectOf: CGSize(width: 150 * scaleFactor, height: 75 * scaleFactor), cornerRadius: 12 * scaleFactor)
-        roundedRectangle.fillColor = .systemRed
-        roundedRectangle.strokeColor = .black
-        roundedRectangle.lineWidth = 3 * scaleFactor
-        roundedRectangle.setScale(1/scaleFactor) /// Scale back to intended size
-        
-        /// Physics body must match the final scaled size, not the supersampled size
-        roundedRectangle.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: 150, height: 75))
-        roundedRectangle.physicsBody?.isDynamic = false
-        roundedRectangle.physicsBody?.categoryBitMask = 0x1 << 1
-        roundedRectangle.physicsBody?.collisionBitMask = 0x1 << 1
-        addChild(roundedRectangle)
-        
-        let action = SKAction.rotate(byAngle: .pi, duration: 1)
-        roundedRectangle.run(.repeatForever(action))
-        
-        /// Ground sprite
-        let ground = SKSpriteNode(color: .black, size: CGSize(width: 350, height: 10))
-        ground.physicsBody = SKPhysicsBody(rectangleOf: ground.size)
-        ground.physicsBody?.isDynamic = false
-        ground.physicsBody?.restitution = 1
-        ground.physicsBody?.categoryBitMask = BitMasks.cat1.rawValue
-        ground.physicsBody?.collisionBitMask = BitMasks.cat1.rawValue
-        ground.position = CGPoint(x: 0, y: -100)
-        addChild(ground)
-        
-        /// Text node
-        let label = SKLabelNode(text: "SKRenderer")
-        label.fontName = "Menlo-Bold"
-        label.fontColor = .systemYellow
-        label.position = CGPoint(x: 0, y: 300)
-        label.verticalAlignmentMode = .center
-        addChild(label)
-        
-        /// Programmatic textures should be scaled by scaleFactor for more than @1x rendering
-        let textureSize = CGSize(width: 2 * scaleFactor, height: 2 * scaleFactor)
-        let cgRenderer = UIGraphicsImageRenderer(size: textureSize)
-        let particleTexture = SKTexture(image: cgRenderer.image { context in
-            SKColor.white.setFill()
-            context.fill(CGRect(origin: .zero, size: textureSize))
-        })
-        
-        /// Particle emitter with programmatic texture
-        let emitter = SKEmitterNode()
-        emitter.particleTexture = particleTexture
-        emitter.particleScale = 1 / scaleFactor
-        emitter.particlePositionRange = CGVector(dx: label.calculateAccumulatedFrame().width, dy: label.calculateAccumulatedFrame().height)
-        emitter.particleScaleSpeed = -0.2
-        emitter.particleBirthRate = 3000
-        emitter.particleLifetime = 6.0
-        emitter.particleColor = .systemYellow
-        emitter.particleColorBlendFactor = 1.0
-        emitter.particleSpeed = 100
-        emitter.particleSpeedRange = 100
-        emitter.emissionAngle = -.pi / 2
-        emitter.particleAlpha = 0.4
-        emitter.particleAlphaSpeed = -0
-        emitter.particleBlendMode = .add
-        emitter.position = CGPoint(x: 0, y: 300)
-        emitter.fieldBitMask = BitMasks.cat2.rawValue
-        addChild(emitter)
-        
-        /// Turbulence field affecting particles
-        /// Physics fields use a different engine than physics bodies, are SIMD based, and appear to be deterministic
-        let field = SKFieldNode.noiseField(withSmoothness: 1, animationSpeed: 1)
-        field.strength = 1
-        field.categoryBitMask = BitMasks.cat2.rawValue
-        addChild(field)
-    }
-    
-    // MARK: Physics Contacts
-    
-    func didBegin(_ contact: SKPhysicsContact) {
-        feedback.impactOccurred(intensity: 0.5)
-    }
-    
-    // MARK: Loop
-    
-    override func update(_ currentTime: TimeInterval) {
-        /// First frame, initialize delta time
-        if lastUpdateTime == 0 {
-            lastUpdateTime = currentTime
-        }
-        
-        /// Calculate delta time
-        deltaTime = currentTime - lastUpdateTime
-        
-        /// Store for next frame
-        lastUpdateTime = currentTime
-        
-        /// During offline rendering, even if we supply a fixed timestep, we get alternating
-        /// delta time values because we are adding 1/60 each time (floating point precision)
-        //print(deltaTime)
-        /*
-         0.016666666720993817
-         0.016666666604578495
-         0.016666666720993817
-         0.016666666604578495
-         0.016666666720993817
-         0.016666666720993817
-         0.016666666604578495
-         0.016666666720993817
-         */
-    }
-    
-}
-
-// MARK: Controller
+// MARK: - Controller
 
 @Observable
 class SKRenderController {
@@ -454,6 +243,69 @@ class SKRenderController {
     var currentFrame = 0
     var totalFrames = 0
     var message: String?
+    
+    /// Test modes for SpriteKit's current time behavior
+    enum CurrentTimeMode {
+        case normal           /// Monotonically increasing
+        case frozen           /// Same time every frame
+        case backwards        /// Decreasing time
+    }
+    
+    /**
+     
+     Findings:
+     
+     # Backwards
+     
+     A decreasing current time value is passed every frame:
+     - Actions with duration or delay > 0 are not ran.
+     - Particles don't spawn.
+     - Physics bodies don't run.
+     - Physics fields don't run
+     
+     # Frozen
+     
+     The same current time value is passed every frame:
+     - Actions with duration or delay > 0 are not ran.
+     - Particles spawn but do not animate or change.
+     - Physics bodies run at 1x speed.
+     - Physics fields don't run
+     
+     # Normal
+     
+     A base time is stored with CACurrentMediaTime when SKRenderer is initialized.
+     Successive delta times are added for each new frame.
+     This is the setup SpriteKit expects, also called monotonically increasing value.
+     
+     Below are results with various speed factors:
+     
+     Delta time ×10, physicsWorld.speed = 1
+     - Actions run at 10×
+     - Particles sped up 10×
+     - Physics bodies run at 10x
+     - Physics fields run at 10x
+     
+     Delta time ×10, physicsWorld.speed = 0.1
+     - Actions run at 10×
+     - Particles run at 10×
+     - Physics bodies run at 1x (they look real-time, not sped up)
+     - Physics fields run at 10x
+     
+     PhysicsWorld.speed = 0
+     - Physics bodies don't run, regardless of current time
+     - Physics fields run at current time. Fields are not impacted by PhysicsWorld speed
+          
+     # Conclusion
+     
+     ------------------------------------------------------------------------
+     PhysicsWorld.speed sets the rate of physics with bodies.
+     PhysicsWorld.speed overrides the current time value IF the rate is not 1.
+     If current time is not increasing and PhysicsWorld.speed is 1, physics bodies run at real-time speed.
+     
+     → For proper offline rendering timing control: set both currentTime AND physicsWorld.speed explicitly.
+     ------------------------------------------------------------------------
+     */
+    var currentTimeMode: CurrentTimeMode = .normal
     
     // MARK: Render Sequence
     
@@ -497,7 +349,16 @@ class SKRenderController {
             
             for frame in 0..<totalFrames {
                 currentFrame = frame + 1
-                currentTime += deltaTime
+                
+                /// Current time test: apply different time progression modes
+                switch currentTimeMode {
+                case .normal:
+                    currentTime += deltaTime
+                case .frozen:
+                    currentTime = 0
+                case .backwards:
+                    currentTime -= deltaTime
+                }
                 
                 /// Get CGImage for this frame
                 let cgImage = try await offlineRenderer.renderFrame(atTime: currentTime)
@@ -595,7 +456,224 @@ class SKRenderController {
     }
 }
 
-// MARK: Renderer
+// MARK: - Scene
+
+class SKRenderScene: SKScene, SKPhysicsContactDelegate {
+    
+    var deltaTime: TimeInterval = 0
+    private var lastUpdateTime: TimeInterval = 0
+    
+    let scaleFactor: CGFloat
+    var feedback = UIImpactFeedbackGenerator()
+    
+    struct BitMasks: OptionSet {
+        let rawValue: UInt32
+        
+        static let body1 = BitMasks(rawValue: 1 << 0)
+        static let body2 = BitMasks(rawValue: 1 << 1)
+        static let field1 = BitMasks(rawValue: 1 << 2)
+        
+        static let none = BitMasks([])
+        static let all = BitMasks(rawValue: UInt32.max)
+    }
+    
+    // MARK: Init
+    
+    /// Setup must be done in `init` or `sceneDidLoad` since SKRenderer doesn't call `didMove(to view)`
+    init(size: CGSize, scaleFactor: CGFloat, filter: CIFilter?) {
+        self.scaleFactor = scaleFactor
+        
+        super.init(size: size)
+        
+        self.scaleMode = .aspectFit
+        self.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+        self.backgroundColor = .darkGray
+        self.physicsWorld.contactDelegate = self
+        self.physicsWorld.speed = 1
+        
+        /// Apply CoreImage filter if provided
+        if let filter = filter {
+            self.shouldEnableEffects = true
+            self.filter = filter
+        }
+        
+        createContent()
+        
+        /// Control when bouncing balls are created, for physics determinism tests
+        let sequence1 = SKAction.sequence([
+            .wait(forDuration: 0),
+            .run { [weak self] in
+                self?.createBouncingBalls()
+            }
+        ])
+        
+        run(sequence1)
+    }
+    
+    required init?(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    // MARK: didMove
+    
+    override func didMove(to view: SKView) {
+        /// Better looking during device orientation change
+        view.contentMode = .center
+        /// When presented by SKView, we want the scene to fill the screen
+        scaleMode = .resizeFill
+        
+        feedback = UIImpactFeedbackGenerator(view: view)
+        feedback.prepare()
+    }
+    
+    // MARK: Content
+    
+    private func createBouncingBalls() {
+        /// Bouncing balls
+        /// Test physics determinsim. Collisions and friction stress test physics predictability run after run
+        let circleCount = 5
+        let spacing: CGFloat = 60
+        let totalWidth = CGFloat(circleCount - 1) * spacing
+        let startX = -totalWidth / 2
+        
+        for i in 0..<circleCount {
+            let circle = SKShapeNode(circleOfRadius: 18 * scaleFactor)
+            circle.fillColor = .orange
+            circle.lineWidth = 2 * scaleFactor
+            circle.strokeColor = .black
+            circle.setScale(1/scaleFactor)
+            
+            circle.physicsBody = SKPhysicsBody(circleOfRadius: 18)
+            circle.physicsBody?.collisionBitMask = BitMasks.body1.rawValue
+            circle.physicsBody?.contactTestBitMask = BitMasks.body1.rawValue
+            circle.physicsBody?.fieldBitMask = BitMasks.field1.rawValue
+            /// Toggle these lines to test determinism
+            //circle.physicsBody?.restitution = 1
+            //circle.physicsBody?.linearDamping = 0
+            let x = startX + CGFloat(i) * spacing
+            circle.position = CGPoint(x: x, y: 150)
+            addChild(circle)
+        }
+    }
+    
+    private func createContent() {
+        /// Physical border
+        let frameSize = CGSize(width: 390, height: 844)
+        let frame = SKShapeNode(rectOf: frameSize)
+        frame.strokeColor = .black
+        frame.physicsBody = SKPhysicsBody(edgeLoopFrom: frame.frame)
+        addChild(frame)
+        
+        /// SKShapeNodes with antialiasing render blurry when output resolution is more than @1x (but render sharp in SKView)
+        /// Solution: supersampling. Create shapes at @x size, then scale down by @x
+        let roundedRectangle = SKShapeNode(rectOf: CGSize(width: 150 * scaleFactor, height: 75 * scaleFactor), cornerRadius: 12 * scaleFactor)
+        roundedRectangle.fillColor = .systemRed
+        roundedRectangle.strokeColor = .black
+        roundedRectangle.lineWidth = 3 * scaleFactor
+        roundedRectangle.setScale(1/scaleFactor) /// Scale back to intended size
+        
+        /// Physics body must match the final scaled size, not the supersampled size
+        roundedRectangle.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: 150, height: 75))
+        roundedRectangle.physicsBody?.isDynamic = false
+        roundedRectangle.physicsBody?.categoryBitMask = BitMasks.body2.rawValue
+        roundedRectangle.physicsBody?.collisionBitMask = BitMasks.body2.rawValue
+        addChild(roundedRectangle)
+        
+        let action = SKAction.rotate(byAngle: .pi, duration: 1)
+        roundedRectangle.run(.repeatForever(action))
+        
+        /// Ground sprite
+        let ground = SKSpriteNode(color: .black, size: CGSize(width: 350, height: 10))
+        ground.physicsBody = SKPhysicsBody(rectangleOf: ground.size)
+        ground.physicsBody?.isDynamic = false
+        ground.physicsBody?.restitution = 1
+        ground.physicsBody?.categoryBitMask = BitMasks.body1.rawValue
+        ground.physicsBody?.collisionBitMask = BitMasks.body1.rawValue
+        ground.position = CGPoint(x: 0, y: -100)
+        addChild(ground)
+        
+        /// Text node
+        let label = SKLabelNode(text: "SKRenderer")
+        label.fontName = "Menlo-Bold"
+        label.fontColor = .systemYellow
+        label.position = CGPoint(x: 0, y: 300)
+        label.verticalAlignmentMode = .center
+        addChild(label)
+        
+        /// Programmatic textures should be scaled by scaleFactor for more than @1x rendering
+        let textureSize = CGSize(width: 2 * scaleFactor, height: 2 * scaleFactor)
+        let cgRenderer = UIGraphicsImageRenderer(size: textureSize)
+        let particleTexture = SKTexture(image: cgRenderer.image { context in
+            SKColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: textureSize))
+        })
+        
+        /// Particle emitter with programmatic texture
+        let emitter = SKEmitterNode()
+        emitter.particleTexture = particleTexture
+        emitter.particleScale = 1 / scaleFactor
+        emitter.particlePositionRange = CGVector(dx: label.calculateAccumulatedFrame().width, dy: label.calculateAccumulatedFrame().height)
+        emitter.particleScaleSpeed = -0.2
+        emitter.particleBirthRate = 3000
+        emitter.particleLifetime = 6.0
+        emitter.particleColor = .systemYellow
+        emitter.particleColorBlendFactor = 1.0
+        emitter.particleSpeed = 100
+        emitter.particleSpeedRange = 100
+        emitter.emissionAngle = -.pi / 2
+        emitter.particleAlpha = 0.4
+        emitter.particleAlphaSpeed = -0
+        emitter.particleBlendMode = .add
+        emitter.position = CGPoint(x: 0, y: 300)
+        emitter.fieldBitMask = BitMasks.field1.rawValue
+        addChild(emitter)
+        
+        /// Turbulence field affecting particles
+        /// Physics fields use a different engine than physics bodies, are SIMD based, and appear to be deterministic
+        let field = SKFieldNode.noiseField(withSmoothness: 1, animationSpeed: 1)
+        field.strength = 1
+        field.categoryBitMask = BitMasks.field1.rawValue
+        addChild(field)
+    }
+    
+    // MARK: Physics Contacts
+    
+    func didBegin(_ contact: SKPhysicsContact) {
+        feedback.impactOccurred(intensity: 0.5)
+    }
+    
+    // MARK: Loop
+    
+    override func update(_ currentTime: TimeInterval) {
+        /// First frame, initialize delta time
+        if lastUpdateTime == 0 {
+            lastUpdateTime = currentTime
+        }
+        
+        /// Calculate delta time
+        deltaTime = currentTime - lastUpdateTime
+        
+        /// Store for next frame
+        lastUpdateTime = currentTime
+        
+        /// During offline rendering, even if we supply a fixed timestep, we get alternating
+        /// delta time values because we are adding 1/60 each time (floating point precision)
+        //print(deltaTime)
+        /*
+         0.016666666720993817
+         0.016666666604578495
+         0.016666666720993817
+         0.016666666604578495
+         0.016666666720993817
+         0.016666666720993817
+         0.016666666604578495
+         0.016666666720993817
+         */
+    }
+    
+}
+
+// MARK: - SKRenderer
 
 class SKOfflineRenderer {
     
@@ -664,10 +742,9 @@ class SKOfflineRenderer {
     func renderFrame(atTime time: TimeInterval) async throws -> CGImage {
         /// withCheckedThrowingContinuation bridges Metal's callback-based API to async/await
         try await withCheckedThrowingContinuation { continuation in
-            /// Convert relative time to absolute time
-            /// This ensures particles are rendered
-            let absoluteTime = startTime + time
-            renderer.update(atTime: absoluteTime)
+            /// Get current time from starting time + supplied time
+            let currentTime = startTime + time
+            renderer.update(atTime: currentTime)
             
             /// Configure render pass descriptor
             let renderPassDescriptor = MTLRenderPassDescriptor()
@@ -759,7 +836,7 @@ class SKOfflineRenderer {
     }
 }
 
-// MARK: Error Messages
+// MARK: - Error Messages
 /**
  
  User defined error messages for logging.
