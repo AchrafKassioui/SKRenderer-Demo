@@ -4,10 +4,24 @@
  
  Achraf Kassioui
  Created 20 Nov 2025
- Updated 26 Nov 2025
+ Updated 4 Jan 2026
  
  */
 import UIKit
+
+// MARK: CGSize
+
+extension CGSize {
+    /// Returns a CGRect centered at the origin.
+    func centeredRect() -> CGRect {
+        CGRect(origin: CGPoint(x: -width / 2, y: -height / 2), size: self)
+    }
+    
+    /// Resizes both width and height by a fixed delta.
+    func resizeBy(_ amount: CGFloat) -> CGSize {
+        CGSize(width: width + amount, height: height + amount)
+    }
+}
 
 // MARK: Colors
 
