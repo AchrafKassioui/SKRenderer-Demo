@@ -11,7 +11,7 @@ This app demonstrates:
 
 ## Usage
 
-The app runs in Xcode Live Preview, Simulator, iOS device, or Mac Catalyst. Use the controls to adjust render settings.
+The app runs in Xcode Live Preview, Simulator, iOS device, and Mac Catalyst. Use the controls to adjust render settings.
 
 When rendering starts, the live SKView is paused to free resources for the offline renderer. When rendering completes:
 
@@ -20,11 +20,11 @@ When rendering starts, the live SKView is paused to free resources for the offli
 
 ### Render to Video
 
-https://github.com/user-attachments/assets/ede23bb2-0087-4b8d-b454-fa53d3dd0177
+https://github.com/user-attachments/assets/7f72745a-1fcb-4a38-bb2d-84f55aabbca1
 
 ### Render to PNGs
 
-https://github.com/user-attachments/assets/db7404a4-074f-4a62-8c4e-00b2c48fc63c
+https://github.com/user-attachments/assets/ef90bb02-be4c-443e-814e-61fd6c4bb38e
 
 ## SKRenderer
 
@@ -165,7 +165,7 @@ let squareTexture = SKTexture(image: cgRenderer.image { context in
 })
 ```
 
-## Time Management
+## Simulation Time
 
 SpriteKit's update function takes a current time value, not a delta time. When the scene is updated with SKRenderer `update(atTime:)` method, the correct value must be passed. I found that time values must start from a `CACurrentMediaTime()` and not 0. Then, each tick, add a delta time:
 
@@ -304,5 +304,5 @@ If your setup depends on precise physics body positions interacting over multipl
 
 ---
 
-*Published 5 Nov 2025*
-*Updated 12 Jan 2026*
+*Published 5 Nov 2025*  
+*Updated 13 Jan 2026*
