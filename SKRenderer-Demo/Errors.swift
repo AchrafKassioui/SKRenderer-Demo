@@ -2,11 +2,11 @@
  
  ## Error Messages
  
- User defined error messages for logging.
+ User defined error messages.
  
  Achraf Kassioui
- Created 20 Nov 2026
- Updated 3 Jan 2026
+ Created 20 Nov 2025
+ Updated 6 Jan 2026
  
  */
 import Foundation
@@ -15,6 +15,7 @@ enum RenderError: Error, LocalizedError {
     case noMetalDevice
     case noCommandQueue
     case noTexture
+    case noDepthStencilTexture
     case noCommandBuffer
     case rendererDeallocated
     case failedToCreateDataProvider
@@ -38,6 +39,7 @@ enum RenderError: Error, LocalizedError {
         case .noMetalDevice: return "Metal not available on this device"
         case .noCommandQueue: return "Failed to create Metal command queue"
         case .noTexture: return "Failed to create render texture"
+        case .noDepthStencilTexture: return "Failed to create depth/stencil texture"
         case .noCommandBuffer: return "Failed to create command buffer"
         case .rendererDeallocated: return "Renderer was deallocated during rendering"
         case .failedToCreateDataProvider: return "Failed to create data provider from texture"

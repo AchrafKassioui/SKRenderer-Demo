@@ -16,16 +16,15 @@ class SKOfflineRenderer {
     // MARK: Properties
     
     let renderer: SKRenderer
+    private let sceneSize: CGSize
+    private let backgroundColor: MTLClearColor
     
     private let device: MTLDevice
     private let commandQueue: MTLCommandQueue
     private let renderTexture: MTLTexture
-    private var depthStencilTexture: MTLTexture?
-    private var outputTexture: MTLTexture? /// IOSurface-backed, we blip to this
+    private let depthStencilTexture: MTLTexture
+    private var outputTexture: MTLTexture? /// IOSurface-backed, render texture is blit to this
     private(set) var outputIOSurface: IOSurface? /// Video writer reads from this
-    private let sceneSize: CGSize
-    private let backgroundColor: MTLClearColor
-    private let startTime: TimeInterval
     
     // MARK: Init
     
@@ -62,8 +61,9 @@ class SKOfflineRenderer {
             throw RenderError.noTexture
         }
         self.renderTexture = texture
-        
-        /// Create depth/stencil texture for SKRenderer
+
+        /// If I dont use a depth/stencil texture, rendering crashes on simulator, device, and Mac
+        /// Without it, rendering only works on Xcode Live Preview
         let depthStencilDesc = MTLTextureDescriptor()
         depthStencilDesc.pixelFormat = .depth32Float_stencil8
         depthStencilDesc.width = pixelWidth
@@ -71,21 +71,20 @@ class SKOfflineRenderer {
         depthStencilDesc.usage = .renderTarget
         depthStencilDesc.storageMode = .private
         
-        depthStencilTexture = device.makeTexture(descriptor: depthStencilDesc)
+        guard let texture2 = device.makeTexture(descriptor: depthStencilDesc) else {
+            throw RenderError.noDepthStencilTexture
+        }
+        
+        depthStencilTexture = texture2
         
         /// Create SKRenderer and scene
         /// Scene size is in points
         /// SKRenderer automatically maps viewport (points) to texture (pixels) at the correct scale
         renderer = SKRenderer(device: device)
-        let scene = SKRenderScene(size: size, scaleFactor: renderScale, imageFilter: imageFilter)
+        let scene = RenderScene(size: size, scaleFactor: renderScale, imageFilter: imageFilter)
         renderer.scene = scene
         
         self.backgroundColor = scene.backgroundColor.metalClearColor
-        
-        /// Store absolute start time for particle systems
-        /// SKScene's update() expects system time
-        /// Without this, particles are not rendered
-        self.startTime = CACurrentMediaTime()
         
         /// Setup IOSurface-backed texture for video output
         if useIOSurface {
@@ -131,49 +130,48 @@ class SKOfflineRenderer {
         }
     }
     
-    // MARK: Render To Video
+    // MARK: Render To IOSurface
     /**
      
      Render frame and copy to IOSurface for video encoding
      
      Pipeline: SpriteKit → render texture (GPU memory) → blit → IOSurface-backed texture → CPU can read for video encoder
-     The blit copies GPU texture data to IOSurface, which can be accessed by both GPU and CPU without additional copies
+     The blit copies GPU texture data to IOSurface, which can be accessed by both GPU and CPU
      
      */
-    func renderFrameToIOSurface(atTime time: TimeInterval) async throws {
+    func renderToIOSurface(atTime time: TimeInterval) async throws {
         guard let outputTexture = outputTexture else {
             throw RenderError.noIOSurfaceTexture
         }
         
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            let currentTime = startTime + time
-            renderer.update(atTime: currentTime)
+            renderer.update(atTime: time)
             
+            /// Set render texture
             let renderPassDescriptor = MTLRenderPassDescriptor()
             renderPassDescriptor.colorAttachments[0].texture = renderTexture
             renderPassDescriptor.colorAttachments[0].loadAction = .clear
             renderPassDescriptor.colorAttachments[0].clearColor = backgroundColor
             renderPassDescriptor.colorAttachments[0].storeAction = .store
+
+            /// Set depth/stencil texture
+            renderPassDescriptor.depthAttachment.texture = depthStencilTexture
+            renderPassDescriptor.depthAttachment.loadAction = .clear
+            renderPassDescriptor.depthAttachment.storeAction = .dontCare
+            renderPassDescriptor.depthAttachment.clearDepth = 1.0
             
-            /// If i dont use a stencil texture, rendering crashes on simulator, device, and Mac
-            /// Without stencil, rendering only works on Xcode Live Preview
-            if let depthStencilTexture = depthStencilTexture {
-                renderPassDescriptor.depthAttachment.texture = depthStencilTexture
-                renderPassDescriptor.depthAttachment.loadAction = .clear
-                renderPassDescriptor.depthAttachment.storeAction = .dontCare
-                renderPassDescriptor.depthAttachment.clearDepth = 1.0
-                
-                renderPassDescriptor.stencilAttachment.texture = depthStencilTexture
-                renderPassDescriptor.stencilAttachment.loadAction = .clear
-                renderPassDescriptor.stencilAttachment.storeAction = .dontCare
-                renderPassDescriptor.stencilAttachment.clearStencil = 0
-            }
+            renderPassDescriptor.stencilAttachment.texture = depthStencilTexture
+            renderPassDescriptor.stencilAttachment.loadAction = .clear
+            renderPassDescriptor.stencilAttachment.storeAction = .dontCare
+            renderPassDescriptor.stencilAttachment.clearStencil = 0
             
+            /// Create command buffer for this frame
             guard let commandBuffer = commandQueue.makeCommandBuffer() else {
                 continuation.resume(throwing: RenderError.noCommandBuffer)
                 return
             }
             
+            /// Render scene into texture
             let viewport = CGRect(origin: .zero, size: sceneSize)
             renderer.render(
                 withViewport: viewport,
@@ -182,7 +180,6 @@ class SKOfflineRenderer {
             )
             
             /// Blit (GPU copy) render texture to IOSurface-backed texture
-            /// This is a fast GPU-to-GPU copy that makes the frame accessible to CPU for video encoding
             guard let blitEncoder = commandBuffer.makeBlitCommandEncoder() else {
                 continuation.resume(throwing: RenderError.noBlitEncoder)
                 return
@@ -201,6 +198,7 @@ class SKOfflineRenderer {
             )
             blitEncoder.endEncoding()
             
+            /// addCompletedHandler is called when GPU work is done for this frame
             commandBuffer.addCompletedHandler { _ in
                 continuation.resume()
             }
@@ -212,12 +210,10 @@ class SKOfflineRenderer {
     // MARK: Render to Image
     
     /// Renders one frame at the specified time
-    func renderFrame(atTime time: TimeInterval) async throws -> CGImage {
+    func renderToCGImage(atTime time: TimeInterval) async throws -> CGImage {
         /// withCheckedThrowingContinuation bridges Metal's callback-based API to async/await
         try await withCheckedThrowingContinuation { continuation in
-            /// Get current time from starting time + supplied time
-            let currentTime = startTime + time
-            renderer.update(atTime: currentTime)
+            renderer.update(atTime: time)
             
             /// Configure render pass descriptor
             let renderPassDescriptor = MTLRenderPassDescriptor()
@@ -226,18 +222,16 @@ class SKOfflineRenderer {
             renderPassDescriptor.colorAttachments[0].clearColor = backgroundColor
             renderPassDescriptor.colorAttachments[0].storeAction = .store
             
-            /// Set depth/stencil if available
-            if let depthStencilTexture = depthStencilTexture {
-                renderPassDescriptor.depthAttachment.texture = depthStencilTexture
-                renderPassDescriptor.depthAttachment.loadAction = .clear
-                renderPassDescriptor.depthAttachment.storeAction = .dontCare
-                renderPassDescriptor.depthAttachment.clearDepth = 1.0
-                
-                renderPassDescriptor.stencilAttachment.texture = depthStencilTexture
-                renderPassDescriptor.stencilAttachment.loadAction = .clear
-                renderPassDescriptor.stencilAttachment.storeAction = .dontCare
-                renderPassDescriptor.stencilAttachment.clearStencil = 0
-            }
+            /// Set depth/stencil
+            renderPassDescriptor.depthAttachment.texture = depthStencilTexture
+            renderPassDescriptor.depthAttachment.loadAction = .clear
+            renderPassDescriptor.depthAttachment.storeAction = .dontCare
+            renderPassDescriptor.depthAttachment.clearDepth = 1.0
+            
+            renderPassDescriptor.stencilAttachment.texture = depthStencilTexture
+            renderPassDescriptor.stencilAttachment.loadAction = .clear
+            renderPassDescriptor.stencilAttachment.storeAction = .dontCare
+            renderPassDescriptor.stencilAttachment.clearStencil = 0
             
             /// Create command buffer for this frame
             guard let commandBuffer = commandQueue.makeCommandBuffer() else {

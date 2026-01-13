@@ -1,34 +1,22 @@
 /**
  
- # SpriteKit Offline Rendering
+ # View + Controller
  
- Render SpriteKit scenes to video or image sequences using SKRenderer.
+ The overall structure of the app is as follows:
  
- ## Architecture
+ - MainView: the app interface with SKView and render controls
+ - SKRenderController: orchestrates rendering, manages progress, and handles file I/O
+ - SKRenderScene: the SpriteKit content
+ - SKOfflineRenderer: wraps SKRenderer, manages Metal textures and IOSurface, and converts to PNG
+ - VideoWriter: encodes rendered frames to H.264 video via AVAssetWriter
  
- - MainView: SwiftUI interface with render controls
- - SKRenderController: Orchestrates rendering, manages progress, and file I/O
- - SKOfflineRenderer: Wraps SKRenderer, manages Metal textures and IOSurface, and converts to PNG
- - SKVideoWriter: Encodes frames to H.264 video via AVAssetWriter
- - SKRenderScene: The SpriteKit scene being rendered
+ ## Todo
  
- ## Video Pipeline
- 
- - SKRenderer draws scene to Metal texture (GPU)
- - Render texture is copied (blit) to IOSurface-backed texture
- - SKVideoWriter transfers IOSurface to CVPixelBuffer
- - AVAssetWriter encodes to H.264 and writes MP4
- 
- ## Frame Pipeline
- 
- - SKRenderer draws scene to Metal texture (GPU)
- - getBytes() copies texture's pixel data
- - CGImage created from pixel data
- - PNG encoded and written to disk
+ - Export frames should take a number of frames to export + fps or delta time.
  
  Achraf Kassioui
  Created 20 Nov 2025
- Updated 5 Jan 2026
+ Updated 6 Jan 2026
  
  */
 import SpriteKit
@@ -71,7 +59,7 @@ struct MainView: View {
     
     // MARK: State
     
-    @State private var liveScene: SKRenderScene?
+    @State private var liveScene: RenderScene?
     @State private var controller = SKRenderController()
     
     @State private var renderDuration: TimeInterval = 5
@@ -80,7 +68,7 @@ struct MainView: View {
     @State private var renderResolution: RenderResolution = .viewSize
     @State private var imageFilter: CoreImageFilter = .none
     @State private var outputFormat: OutputFormat = .video
-    @State private var videoQuality: VideoQuality = .high
+    @State private var videoBitrate: VideoBitrate = .high
     @State private var showShareSheet = false
     
     // MARK: Properties
@@ -93,12 +81,13 @@ struct MainView: View {
                 
                 // MARK: SKView
                 
-                if !controller.isRendering {
-                    if let scene = liveScene {
-                        SpriteView(
-                            scene: scene,
-                            debugOptions: [.showsFPS, .showsNodeCount]
-                        )
+                if let scene = liveScene {
+                    SpriteView(
+                        scene: scene,
+                        debugOptions: [.showsFPS, .showsNodeCount]
+                    )
+                    .onChange(of: controller.isRendering) { _, newValue in
+                        liveScene?.isPaused = newValue
                     }
                 }
                 
@@ -180,7 +169,7 @@ struct MainView: View {
                                         Text(filter.rawValue).tag(filter)
                                     }
                                 }
-                                .pickerStyle(.menu)
+                                .pickerStyle(.segmented)
                                 .tint(.white)
                                 .onChange(of: imageFilter) { _, newFilter in
                                     liveScene?.applyFilter(newFilter)
@@ -198,17 +187,17 @@ struct MainView: View {
                                     Task {
                                         switch outputFormat {
                                         case .video:
-                                            await controller.renderVideo(
+                                            await controller.exportVideo(
                                                 duration: renderDuration,
                                                 size: renderResolution.size(viewSize: geometry.size),
                                                 renderScale: scaleFactor,
                                                 fps: renderFPS,
                                                 imageFilter: imageFilter,
-                                                quality: videoQuality
+                                                bitrate: videoBitrate
                                                 
                                             )
                                         case .frames:
-                                            await controller.renderFrames(
+                                            await controller.exportFrames(
                                                 duration: renderDuration,
                                                 size: renderResolution.size(viewSize: geometry.size),
                                                 renderScale: scaleFactor,
@@ -243,7 +232,7 @@ struct MainView: View {
                 .padding(.bottom, max(geometry.safeAreaInsets.bottom, 20))
             }
             .onAppear {
-                liveScene = SKRenderScene(size: geometry.size, scaleFactor: scaleFactor, imageFilter: imageFilter)
+                liveScene = RenderScene(size: geometry.size, scaleFactor: scaleFactor, imageFilter: imageFilter)
             }
         }
         .ignoresSafeArea()
@@ -267,7 +256,12 @@ struct MainView: View {
 }
 
 // MARK: Share Sheet
-
+/**
+ 
+ Triggered on iOS devices only, not simulator or Mac.
+ This is on purpose, because console + file path are easy to access with simulator and Mac.
+ 
+ */
 struct ShareSheet: UIViewControllerRepresentable {
     let activityItems: [Any]
     
@@ -286,11 +280,7 @@ struct ShareSheet: UIViewControllerRepresentable {
 }
 
 // MARK: Controller
-/**
- 
- Orchestrates rendering, manages progress, and file I/O
- 
- */
+
 @Observable
 class SKRenderController {
     
@@ -298,96 +288,39 @@ class SKRenderController {
     var progress: Double = 0
     var currentFrame = 0
     var totalFrames = 0
-    var message: String?
     
     /// For cleanup and sharing
     private(set) var currentVideoURL: URL?
-    private var currentVideoWriter: SKVideoWriter?
+    private var currentVideoWriter: VideoWriter?
 
-    /**
-     
-     SpriteKit's update function takes a current time value, not a delta time.
-     Below are modes to test SpriteKit behavior when different time values are passed to SKRenderer update function.
-     
-     Findings:
-     
-     # Backwards
-     
-     A decreasing current time value is passed every frame:
-     - Actions with duration or delay > 0 are not ran.
-     - Particles don't spawn.
-     - Physics bodies don't run.
-     - Physics fields don't run
-     
-     # Frozen
-     
-     The same current time value is passed every frame:
-     - Actions with duration or delay > 0 are not ran.
-     - Particles spawn but do not animate or change.
-     - Physics bodies run at 1x speed.
-     - Physics fields don't run
-     
-     # Normal
-     
-     An increasing current time is passed every frame.
-     The start time is get with `CACurrentMediaTime()` when SKRenderer is initialized.
-     Then delta times are accumulated every frame.
-     This is the setup SpriteKit expects: a monotonically increasing current time value.
-     
-     Below are results with various speed factors:
-     
-     Delta time ×10, physicsWorld.speed = 1
-     - Actions run at 10×
-     - Particles sped up 10×
-     - Physics bodies run at 10x
-     - Physics fields run at 10x
-     
-     Delta time ×10, physicsWorld.speed = 0.1
-     - Actions run at 10×
-     - Particles run at 10×
-     - Physics bodies run at 1x (they look real-time, not sped up)
-     - Physics fields run at 10x
-     
-     PhysicsWorld.speed = 0
-     - Physics bodies don't run, regardless of current time
-     - Physics fields run at current time. Fields are not impacted by PhysicsWorld speed
-          
-     # Conclusion
-     
-     ------------------------------------------------------------------------
-     PhysicsWorld.speed sets the rate of physics with bodies.
-     PhysicsWorld.speed overrides the current time value IF the rate is not 1.
-     If current time is not increasing and PhysicsWorld.speed is 1, physics bodies run at real-time speed.
-     
-     → For proper offline rendering timing control: set both currentTime AND physicsWorld.speed explicitly.
-     ------------------------------------------------------------------------
-     */
+    /// Update time tests
     enum CurrentTimeMode {
-        case normal           /// Monotonically increasing
         case frozen           /// Same time every frame
         case backwards        /// Decreasing time
+        case normal           /// Monotonically increasing
+        case doubleSpeed
+        case slowMotion
     }
     
     var currentTimeMode: CurrentTimeMode = .normal
     
-    // MARK: Render Video
+    // MARK: Export Video
     
-    func renderVideo(
+    func exportVideo(
         duration: Double,
         size: CGSize,
         renderScale: CGFloat,
         fps: Double,
         imageFilter: CoreImageFilter,
-        quality: VideoQuality
+        bitrate: VideoBitrate
     ) async {
+        let exportStartTime: TimeInterval = CACurrentMediaTime()
+        
         isRendering = true
-        message = "Starting render..."
         
         totalFrames = Int(duration * fps)
         currentFrame = 0
         progress = 0
-        
-        let totalStartTime = Date()
         
         do {
             let pixelSize = CGSize(width: size.width * renderScale, height: size.height * renderScale)
@@ -399,7 +332,7 @@ class SKRenderController {
             formatter.dateFormat = "yy-MM-dd_HH-mm-ss"
             let timestamp = formatter.string(from: Date())
             
-            let filename = "SKRender_\(Int(duration))s_\(Int(fps))fps_\(quality)_\(timestamp).mp4"
+            let filename = "\(Int(duration))s_\(Int(fps))fps_\(currentTimeMode)_\(bitrate)_\(timestamp).mp4"
             let videoURL = documentDirectory.appendingPathComponent(filename)
             
             /// Create renderer with IOSurface
@@ -410,20 +343,20 @@ class SKRenderController {
                 useIOSurface: true
             )
             
+            guard let ioSurface = offlineRenderer.outputIOSurface else {
+                throw RenderError.noIOSurface
+            }
+            
             /// Create video writer
-            let videoWriter = try SKVideoWriter(
+            let videoWriter = try VideoWriter(
                 url: videoURL,
                 size: pixelSize,
                 fps: Int(fps),
-                quality: quality
+                bitrate: bitrate
             )
             
             /// Store for cleanup
             currentVideoWriter = videoWriter
-            
-            guard let ioSurface = offlineRenderer.outputIOSurface else {
-                throw RenderError.noIOSurface
-            }
             
             print("========================================")
             print("\n🎬 RENDER TO VIDEO")
@@ -433,21 +366,36 @@ class SKRenderController {
             print("   FPS:           \(Int(fps))")
             print("   Frames:        \(totalFrames)")
             print("   Image Filter:  \(imageFilter.rawValue)")
-            print("   Video quality: \(quality)")
+            print("   Video quality: \(bitrate)")
             print()
             
+            /// Always start from CACurrentMediaTime()
+            /// Particles are not rendered if time values start at 0
+            var sceneTime: TimeInterval = 0 + CACurrentMediaTime()
             let deltaTime = 1.0 / fps
-            var currentTime: TimeInterval = 0
             var lastPrintedPercent = 0
             
             print("Rendering...")
             
             for frame in 0..<totalFrames {
                 currentFrame = frame + 1
-                currentTime += deltaTime
+                
+                /// Update time test: apply different time progression modes
+                switch currentTimeMode {
+                case .frozen:
+                    sceneTime += 0
+                case .backwards:
+                    sceneTime -= deltaTime
+                case .normal:
+                    sceneTime += deltaTime
+                case .doubleSpeed:
+                    sceneTime += deltaTime * 2
+                case .slowMotion:
+                    sceneTime += deltaTime / 4
+                }
                 
                 /// Render to IOSurface
-                try await offlineRenderer.renderFrameToIOSurface(atTime: currentTime)
+                try await offlineRenderer.renderToIOSurface(atTime: sceneTime)
                 
                 /// Encode frame
                 try videoWriter.appendFrame(from: ioSurface, frameIndex: frame)
@@ -471,14 +419,12 @@ class SKRenderController {
             currentVideoURL = finalURL
             currentVideoWriter = nil
             
-            let totalTime = Date().timeIntervalSince(totalStartTime)
+            let totalExportTime = CACurrentMediaTime() - exportStartTime
             
             print("\n\n✅ RENDER COMPLETE")
-            print("   Total time: \(String(format: "%.2f", totalTime))s")
+            print("   Total time: \(String(format: "%.2f", totalExportTime))s")
             print("   Video File: \(finalURL.path)")
             logDocumentDirectory()
-            
-            message = nil
         } catch {
             print("❌ RENDER FAILED: \(error)")
             
@@ -488,13 +434,13 @@ class SKRenderController {
                     print("Attempting partial save...")
                     let partialURL = try await writer.finishWriting()
                     currentVideoURL = partialURL
-                    message = "Partial save: \(partialURL.lastPathComponent)"
+                    print("Partial save: \(partialURL.lastPathComponent)")
                 } catch {
                     cleanupFailedRender()
-                    message = "Error: \(error.localizedDescription)"
+                    print("Error: \(error.localizedDescription)")
                 }
             } else {
-                message = "Error: \(error.localizedDescription)"
+                print("Error: \(error.localizedDescription)")
             }
         }
         
@@ -502,17 +448,22 @@ class SKRenderController {
         isRendering = false
     }
     
-    // MARK: Render Frames
+    // MARK: Export Frames
     
-    func renderFrames(duration: Double, size: CGSize, renderScale: CGFloat, fps: Double, imageFilter: CoreImageFilter) async {
+    func exportFrames(
+        duration: Double,
+        size: CGSize,
+        renderScale: CGFloat,
+        fps: Double,
+        imageFilter: CoreImageFilter
+    ) async {
+        let exportStartTime = CACurrentMediaTime()
+        
         isRendering = true
-        message = "Starting render..."
         
         totalFrames = Int(duration * fps)
         currentFrame = 0
         progress = 0
-        
-        let totalStartTime = Date()
         
         do {
             /// Create renderer once, reused for all frames
@@ -537,9 +488,9 @@ class SKRenderController {
             print("   Image Filter:  \(imageFilter)")
             print()
             
-            /// Fixed time step
+            /// Update time
             let deltaTime = 1.0 / fps
-            var currentTime: TimeInterval = 0
+            var currentTime: TimeInterval = 0 + CACurrentMediaTime()
             var lastPrintedPercent = 0
             
             /// Track parallel save operations for logging
@@ -552,6 +503,10 @@ class SKRenderController {
                 
                 /// Current time test: apply different time progression modes
                 switch currentTimeMode {
+                case .doubleSpeed:
+                    currentTime += deltaTime * 2
+                case .slowMotion:
+                    currentTime += deltaTime / 4
                 case .normal:
                     currentTime += deltaTime
                 case .frozen:
@@ -561,7 +516,7 @@ class SKRenderController {
                 }
                 
                 /// Get CGImage for this frame
-                let cgImage = try await offlineRenderer.renderFrame(atTime: currentTime)
+                let cgImage = try await offlineRenderer.renderToCGImage(atTime: currentTime)
                 
                 /// Save to disk on background thread (non-blocking)
                 let saveTask = Task {
@@ -602,22 +557,15 @@ class SKRenderController {
                 await saveTask.value
             }
             
-            let totalTime = Date().timeIntervalSince(totalStartTime)
+            let totalExportTime = CACurrentMediaTime() - exportStartTime
             
             print("\n\n✅ RENDER COMPLETE")
-            print("   Total time: \(String(format: "%.2f", totalTime))s")
+            print("   Total time: \(String(format: "%.2f", totalExportTime))s")
             print("   Image Files: \(outputDir.path)")
             logDocumentDirectory()
             
-            message = "Saved \(totalFrames) frames in \(String(format: "%.1f", totalTime))s"
-            
         } catch {
-            let totalTime = Date().timeIntervalSince(totalStartTime)
-            print("\n========================================")
-            print("RENDER FAILED: \(error)")
-            print("Failed after: \(String(format: "%.2f", totalTime))s")
-            print("========================================\n")
-            message = "Error: \(error.localizedDescription)"
+            print("❌ RENDER FAILED: \(error)")
         }
         
         isRendering = false
@@ -681,12 +629,6 @@ class SKRenderController {
             throw RenderError.failedToEncodePNG
         }
         try pngData.write(to: url)
-    }
-    
-    // MARK: Helpers
-    
-    private func countAllNodes(in node: SKNode) -> Int {
-        return 1 + node.children.reduce(0) { $0 + countAllNodes(in: $1) }
     }
     
 }

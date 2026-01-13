@@ -1,42 +1,54 @@
 # SKRenderer Demo
-*5 Nov 2025. Updated 5 Jan 2026*
+*Published 5 Nov 2025*
+*Updated 12 Jan 2026*
 
-This sample app demonstrates how to use SKRenderer to render and save a SpriteKit simulation to disk.
+## Introduction
 
-## Demo
+<img src="SKRenderer-Demo/Images/SKRenderer-Demo-Screenshot-3.png" alt="SKRenderer-Demo-Screenshot" style="width:33%;" />
 
-https://github.com/user-attachments/assets/fb2fe853-5f9e-4ade-a301-41388df7b5f0
+This app demonstrates:
 
-## SKRenderer Overview
+- Setting up SKRenderer to render a SpriteKit scene
+- Recording a SpriteKit scene to an image sequence
+- Recording a SpriteKit scene to video using IOSurface and AVFoundation
+- Applying Core Image filters
+- Exploring SpriteKit's update timing, physics engine clock, and determinism
+
+## Usage
+
+The app runs in Xcode Live Preview, Simulator, iOS device, or Mac Catalyst. Use the controls to adjust render settings.
+
+When rendering starts, the live SKView is paused to free resources for the offline renderer. When rendering completes:
+
+- Mac/Simulator/Live Preview: the file path is printed to the Xcode console
+- iOS Device: a share sheet appears to save or share the file
+
+### Render to Video
+
+https://github.com/user-attachments/assets/ede23bb2-0087-4b8d-b454-fa53d3dd0177
+
+### Render to PNGs
+
+https://github.com/user-attachments/assets/db7404a4-074f-4a62-8c4e-00b2c48fc63c
+
+## SKRenderer
+
+### Overview
 
 SKRenderer takes a SpriteKit scene and outputs a metal texture. The texture can be used in a Metal pipeline:
 
 - A Metal-backed view can display the output texture on screen, calling update and render each frame in sync with the display refresh rate.
 - Views such as ARView can composite their own render texture with the one produced by SKRenderer. See ARView [RenderCallbacks](https://developer.apple.com/documentation/realitykit/arview/rendercallbacks-swift.struct) and [postProcess](https://developer.apple.com/documentation/realitykit/arview/rendercallbacks-swift.struct/postprocess).
-- SKRenderer can run offscreen, with no view attached. In this mode, the app itself drives the update/render loop and retrieves the texture. This demo uses that approach.
+- SKRenderer can run offscreen, with no view attached. In this mode, the app drives the update/render loop and retrieves the texture. This app uses that approach.
 
 What SKRenderer is not:
 
 - SKRenderer does not expose SKView internals such as its framebuffer. SKView and SKRenderer are separate rendering paths.
 - SKRenderer is not magic. It's a renderer that needs the scene to be updated and computed at regular intervals. RealityKit and SceneKit can integrate SpriteKit content via SKRenderer, but only if the SpriteKit scene can update and render within the available frame budget. In practice, SpriteKit is light enough for this to work well.
 
-## App Structure
+### Setup
 
-<img src="SKRenderer-Demo/Images/SKRenderer-Demo-Screenshot.png" alt="SKRenderer-Demo-Screenshot" style="width:33%;" />
-
-The overall structure is as follows:
-
-- A SpriteKit scene contains all the content and behaviors.
-- One instance of the scene is given to SpriteView (SKView) for live preview.
-- When the user presses Render, a fresh instance of the scene is passed to SKRenderer.
-- SKRenderer runs the scene and renders each frame into a Metal texture.
-- When the GPU finishes a draw, a completion handler fires on the CPU: it copies the Metal texture, converts it to a CGImage, encodes it as PNG, and writes it to disk.
-- Each frame can take as long as needed since we're not syncing to a display refresh rate.
-- The PNGs are saved into a folder inside the app container. The full path is printed to console for retrieval.
-
-## SKRenderer Setup
-
-Below is the boilerplate setup done **once** when SKRenderer is created:
+Below is the boilerplate setup done once when SKRenderer is created:
 
 ```swift
 // Get the GPU
@@ -63,7 +75,7 @@ let renderer = SKRenderer(device: device)
 renderer.scene = scene
 ```
 
-Then for **each frame**, we run code in the following form:
+Then for each frame, we run code in the following form:
 
 ```swift
 // Update scene
@@ -97,11 +109,13 @@ renderer.render(
     renderPassDescriptor: renderPassDescriptor
 )
 
-// Create a callback when GPU finishes a frame
+// GPU work is asynchronous with CPU work
+// commit() submits work but returns immediately
+// completion handler ensures GPU work is done for this frame
 
 commandBuffer.addCompletedHandler {
-    /// Custom function that converts a texture into an image
-    textureToImage(renderTexture)
+    /// Do something with the completed texture, like image encoding
+    encodeFrame(from: texture)
 }
 
 // Send the command buffer to GPU for execution
@@ -109,28 +123,9 @@ commandBuffer.addCompletedHandler {
 commandBuffer.commit()
 ```
 
-## Time Management
+### Resolution and Scale Factor
 
-SKRenderer's `update(atTime:)` expects a system time value, not a delta time. While testing, I found that particles won't render if the time starts at 0 for the first frame. I had to initialize the start time with `CACurrentMediaTime()`, then add a delta for each frame, in order for particles to render correctly.
-
-```swift
-// When SKRenderer is created, grab system time
-
-let renderer = SKRenderer(device: device)
-let startTime = CACurrentMediaTime()
-
-// For each frame to render, pass the start time + a time offset
-
-for frame in 0..<totalFrames {
-    let relativeTime = Double(frame) / fps
-    let currentTime = startTime + relativeTime
-    renderer.update(atTime: currentTime)
-}
-```
-
-## Resolution and Scale Factor
-
-A SpriteKit scene is sized in points. A Metal texture is sized in pixels. If a scene is created at 1920x1080 and SKRenderer draws it, the output will be 1920x1080 pixels. In order to get Retina resolution, we must multiply **the size of the allocated texture by a scale factor**. SKRenderer will handle the mapping between the point-based scene and the pixel-based texture. This is reminiscent of a UIView [contentScaleFactor](https://developer.apple.com/documentation/uikit/uiview/contentscalefactor) property.
+A SpriteKit scene is sized in points. A Metal texture is sized in pixels. If a scene is created at 1920x1080 and SKRenderer draws it, the output will be 1920x1080 pixels. In order to get Retina resolution, we must multiply the size of the allocated texture by a scale factor. SKRenderer will handle the mapping between the point-based scene and the pixel-based texture. This is reminiscent of UIView's [contentScaleFactor](https://developer.apple.com/documentation/uikit/uiview/contentscalefactor) property.
 
 ```swift
 let scene = SKScene(size: CGSize(width: 1920, height: 1080))
@@ -144,12 +139,12 @@ textureDesc.height = Int(1080 * renderScale)  // @3x: 3240 pixels
 renderer.render(...)
 ```
 
-## Known Issues and Workarounds
+### Known Issues and Workarounds
 
-HiDPI scaling doesn't work for all nodes. SKShapeNodes with antialiasing enabled render at @1x no matter the resolution of the Metal texture descriptor, and therefore will appear blurry. A workaround is to use supersampling: create shapes upsized by the scale factor, then scale down:
+HiDPI scaling doesn't work for all nodes. SKShapeNode with antialiasing enabled renders at @1x no matter the resolution of the Metal texture descriptor, and therefore will appear blurry at Retina scales. A workaround is to use supersampling: create shapes upsized by the scale factor, then scale them down:
 
 ```swift
-let scaleFactor: CGFloat = 3 // iPhone scale factor
+let scaleFactor: CGFloat = 3 // iPhone Retina scale
 
 let shape = SKShapeNode(rectOf: CGSize(width: 150 * scaleFactor, height: 75 * scaleFactor))
 shape.lineWidth = 3 * scaleFactor
@@ -162,7 +157,7 @@ shape.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: 150, height: 75))
 
 An alternative is to set `isAntialiased = false` on shape nodes, which will force SKRenderer to draw them at the correct resolution, but curves will appear jagged.
 
-Textures created programmatically should be scaled to match the render scale as well. Pass the scale factor to the generator and scale texture creation accordingly:
+Textures created programmatically should also be scaled to match the Retina target. Pass the scale factor to the generator and scale texture creation accordingly:
 ```swift
 let textureSize = CGSize(width: 2 * scaleFactor, height: 2 * scaleFactor)
 
@@ -175,9 +170,98 @@ let squareTexture = SKTexture(image: cgRenderer.image { context in
 })
 ```
 
-## Use Case: Recording Live Simulations
+## Time Management
 
-This setup lets you record a SpriteKit simulation to disk without affecting real-time performance, and makes it possible to apply expensive post-processing offline: filters, compositing, analysis, etc.
+SpriteKit's update function takes a current time value, not a delta time. When the scene is updated with SKRenderer `update(atTime:)` method, the correct value must be passed. I found that time values must start from a `CACurrentMediaTime()` and not 0. Then, each tick, add a delta time:
+
+```swift
+var sceneTime: TimeInterval = CACurrentMediaTime()
+let deltaTime = 1.0 / fps
+
+for frame in 0..<totalFrames {
+	let currentTime = sceneTime + deltaTime
+    renderer.update(atTime: currentTime)
+}
+```
+
+This time setup is called "monotonically increasing", i.e. the current time is positive and always increasing. I explored various delta time values to understand SpriteKit's internal clock for update, actions, and physics. Below are my findings. In each of these scenarios, current time starts at `CACurrentMediaTime()`.
+
+### Backwards
+
+A delta time is subtracted every frame:
+- Actions with duration or delay > 0 are not ran
+- Particles don't spawn
+- Physics bodies don't run
+- Physics fields don't run
+
+### Frozen
+
+The same current time value is passed every frame:
+- Actions with duration or delay > 0 are not ran
+- Particles spawn but do not animate or change
+- Physics bodies run at 1x speed
+- Physics fields don't run
+
+### Speed Control
+
+A multiple of delta time is added every frame, and `scene.physicsWorld.speed` is set at different values.
+
+`Delta time * 10, physicsWorld.speed = 1`:
+
+- Actions run at 10×
+- Particles sped up 10×
+- Physics bodies run at 10x
+- Physics fields run at 10x
+
+`Delta time * 10, physicsWorld.speed = 0.1`:
+
+- Actions run at 10×
+- Particles run at 10×
+- Physics bodies run at 1x (they look real-time, not sped up)
+- Physics fields run at 10x
+
+`physicsWorld.speed = 0`:
+
+- Physics bodies don't run, regardless of current time
+- Physics fields run at current time. Fields are not impacted by `physicsWorld.speed`
+
+### Conclusion
+
+- `physicsWorld.speed` sets the rate of the physics engine and is different from update's current time.
+- `physicsWorld.speed` overrides the current time value IF the rate is not 1.
+- For proper timing control: set both the current time AND `physicsWorld.speed` explicitly.
+
+## Use Case: Recording
+
+SKRenderer can be used to record a SpriteKit simulation. We can export the scene to a sequence of images or video.
+
+### Export to PNG
+
+The pipeline to export to a sequence of images is as follows:
+
+- A fresh instance of the scene is passed to SKRenderer
+- SKRenderer updates and renders each frame to a Metal render texture
+- The render texture is copied with `texture.getBytes()` to raw pixel data
+- Pixel data is converted to a CGImage, then to a PNG image
+
+The `getBytes()` method is convenient, but slow for high performance needs. For high frame rates or large textures, PNG export is slower than video encoding due to this CPU copy and per-frame PNG compression.
+
+### Export to Video
+
+The pipeline to export to a video is as follows:
+
+- A fresh instance of the scene is passed to SKRenderer.
+- SKRenderer updates and renders each frame to a Metal render texture.
+- The render texture is blit (fast GPU copy) to an IOSurface-backed texture
+- The video writer transfers (memcpy) the IOSurface to CVPixelBuffer
+- AVAssetWriter encodes the pixel buffer to H.264
+- After all frames are encoded, AVAssetWriter finalizes the video file
+
+Video export uses IOSurface, which is a low level memory management framework. IOSurface provides memory that both GPU and CPU can access quickly.
+
+The blit is fast. The memcpy from IOSurface to CVPixelBuffer is faster than getBytes() from a Metal texture. Compared to PNG's getBytes(): this pipeline reduces per-frame overhead from ~5ms to <1ms on iPhone 13 at 1080p.
+
+### Replay a Simulation
 
 In order to record a specific segment of the simulation, the SpriteKit scene must be set up to recover a given state and replay the simulation. Typically this means having a deterministic state initializer + a command pattern on top of SpriteKit:
 ```swift
@@ -201,9 +285,9 @@ A recording pass would be implemented like this:
 - Start the update loop
 - At each frame, replay any commands scheduled for that timestamp
 - Let SKRenderer render as many frames as needed for the interval
-- Save each rendered frame to disk
+- Export the result to video or images 
 
-This enables capturing complex simulations at any resolution and frame rate, fully decoupled from real-time display limits. The resulting frame sequence can then be assembled into a video using AVFoundation.
+This enables capturing complex simulations at any resolution and frame rate, fully decoupled from real-time display limits.
 
 ## Determinism
 
@@ -214,50 +298,11 @@ Interaction and behavior must be deterministic for frame-perfect replay. Conside
 From empirical testing, I found the following to be deterministic:
 
 - SKActions and typical code written in update
-- Physics fields effects on particles, like turbulence, appear predictable, which was a pleasant surprise! The particles themselves aren't identical from run to run, but the overall behavior is repeatable. Mind you, we can't "teleport" particles into a particular state. If the current state of a particle emitter is the result of an interaction with a field, the simulation must be replayed from the first interaction in order to recover the current state. 
+- Physics fields, including effects on particles like turbulence, appear predictable, which was a pleasant surprise!
+- Particles themselves aren't identical from run to run, but the overall behavior is repeatable. Mind you, we can't "teleport" particles into a particular state. If the current state of a particle emitter is the result of an interaction with a field, the simulation must be replayed from the first interaction in order to recover the current state. 
 
-I found the following to not be deterministic, despite the fixed time step of the renderer:
+I found the following to not be deterministic, despite the fixed time step supplied to the renderer:
 
 - Colliding physics bodies. We can see that the bouncing balls above are in different positions at similar simulation time.
 
 If your setup depends on precise physics body positions interacting over multiple seconds, use guide rails to direct the behavior, such as careful level design and checkpoints.
-
-## Performance
-
-Example output from rendering 600 frames (10 seconds at 60fps) at @2x on an iPhone 13 (A15 chip):
-```
-========================================
-RENDERING TO: /Documents/SKRender_2025-11-27_16-49-48
-Resolution: 390×844 points
-Node count: 11
-Scale: @2x
-Actual pixels: 780×1688
-FPS: 60
-Frames: 600
-Filter: None
-========================================
-
-.
-..
-...
-
-========================================
-RENDER COMPLETE
-Location: /Documents/SKRender_2025-11-27_16-49-48
-Frames: 600
-Rendering time: 6.04s (0.010s/frame)
-Saving time: 0.02s
-Total time: 6.06s (0.010s/frame)
-========================================
-```
-
-## Code Sample
-
-The app demonstrates:
-
-- Complete Metal rendering setup
-- SKRenderer scale factor configuration and SKShapeNode supersampling workaround
-- Async/await and error handling patterns
-- Support for CoreImage filters
-
-Use this as a foundation for building replay systems, automated testing, or video export features in SpriteKit projects.

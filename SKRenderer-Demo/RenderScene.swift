@@ -6,7 +6,7 @@
  
  Achraf Kassioui
  Created 26 Nov 2025
- Updated 5 Jan 2026
+ Updated 12 Jan 2026
  
  */
 import SpriteKit
@@ -14,12 +14,12 @@ import SpriteKit
 // MARK: Image Filters
 
 enum CoreImageFilter: String, CaseIterable, Identifiable {
-    case none = "No Filter"
-    case gaussianBlur = "Gaussian Blur"
-    case pixellate = "Pixellate"
-    case sepiaTone = "Sepia Tone"
-    case bloom = "Bloom"
-    case vignette = "Vignette"
+    case none = "0"
+    case filter1 = "1"
+    case filter2 = "2"
+    case filter3 = "3"
+    case filter4 = "4"
+    case filter5 = "5"
     
     var id: String {
         self.rawValue
@@ -28,22 +28,22 @@ enum CoreImageFilter: String, CaseIterable, Identifiable {
     func resolveFilter() -> CIFilter? {
         switch self {
         case .none: return nil
-        case .gaussianBlur:
+        case .filter1:
             let filter = CIFilter.gaussianBlur()
-            filter.radius = 10
+            filter.radius = 20
             return filter
-        case .pixellate:
+        case .filter2:
             let filter = CIFilter.pixellate()
             filter.scale = 10
             return filter
-        case .sepiaTone:
-            return CIFilter.sepiaTone()
-        case .bloom:
-            let filter = CIFilter.bloom()
-            filter.intensity = 0.5
-            filter.radius = 10
+        case .filter3:
+            let filter = CIFilter.colorMonochrome()
+            filter.color = CIColor(red: 0.4, green: 0.4, blue: 0.4)
             return filter
-        case .vignette:
+        case .filter4:
+            let filter = CIFilter.lineOverlay()
+            return filter
+        case .filter5:
             let filter = CIFilter.vignette()
             filter.intensity = 1.0
             filter.radius = 1.0
@@ -68,11 +68,12 @@ struct BitMasks: OptionSet {
 
 // MARK: Scene
 
-class SKRenderScene: SKScene, SKPhysicsContactDelegate {
+class RenderScene: SKScene, SKPhysicsContactDelegate {
     
     var imagefilter: CoreImageFilter
     private(set) var deltaTime: TimeInterval = 0
     
+    private var isOffscreen = true
     private var lastUpdateTime: TimeInterval = 0
     private let scaleFactor: CGFloat
     private var feedback = UIImpactFeedbackGenerator()
@@ -125,6 +126,18 @@ class SKRenderScene: SKScene, SKPhysicsContactDelegate {
         
         feedback = UIImpactFeedbackGenerator(view: view)
         feedback.prepare()
+        
+        isOffscreen = false
+        
+        let pauseAction = SKAction.sequence([
+            .wait(forDuration: 0.2),
+            .run { [weak self] in
+                self?.isPaused = true
+            }
+        ])
+        pauseAction.timingMode = .linear
+        
+        //run(pauseAction)
     }
     
     func applyFilter(_ imageFilter: CoreImageFilter) {
@@ -158,9 +171,11 @@ class SKRenderScene: SKScene, SKPhysicsContactDelegate {
             circle.physicsBody?.collisionBitMask = BitMasks.body1.rawValue
             circle.physicsBody?.contactTestBitMask = BitMasks.body1.rawValue
             circle.physicsBody?.fieldBitMask = BitMasks.none.rawValue
-            /// Toggle these lines to test determinism
+            
+            /// Change these settings to test determinism
             circle.physicsBody?.restitution = 1
-            circle.physicsBody?.linearDamping = 0
+            //circle.physicsBody?.linearDamping = 0
+            
             let x = startX + CGFloat(i) * spacing
             circle.position = CGPoint(x: x, y: 150)
             addChild(circle)
@@ -201,7 +216,6 @@ class SKRenderScene: SKScene, SKPhysicsContactDelegate {
         let ground = SKSpriteNode(color: .black, size: CGSize(width: 350, height: 10))
         ground.physicsBody = SKPhysicsBody(rectangleOf: ground.size)
         ground.physicsBody?.isDynamic = false
-        ground.physicsBody?.restitution = 1
         ground.physicsBody?.categoryBitMask = BitMasks.body1.rawValue
         ground.physicsBody?.collisionBitMask = BitMasks.body1.rawValue
         ground.position = CGPoint(x: 0, y: -100)
@@ -274,7 +288,9 @@ class SKRenderScene: SKScene, SKPhysicsContactDelegate {
         
         /// During offline rendering, even if we supply a fixed timestep, we get alternating
         /// delta time values because we are adding 1/60 each time (floating point precision)
-        //print(deltaTime)
+        if isOffscreen {
+            //print(deltaTime)
+        }
         /*
          0.016666666720993817
          0.016666666604578495

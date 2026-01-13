@@ -6,9 +6,9 @@
  Reusable across SpriteKit, RealityKit, or any Metal-based renderer.
  
  Usage:
- 1. Create writer with URL, size, and FPS
- 2. Call appendFrame() for each frame in sequence
- 3. Call finishWriting() to finalize the MP4
+ - Create writer with parameters
+ - Call appendFrame() for each frame to add to the video
+ - Call finishWriting() to finalize the video file
  
  Achraf Kassioui
  Created 3 Jan 2026
@@ -17,14 +17,22 @@
  */
 import AVFoundation
 
-/// Video quality presets
-enum VideoQuality {
-    case low        /// ~2 Mbps/MP
+// MARK: Encoding Quality
+/**
+ 
+ Bitrate calculation: (width × height / 1,000,000) × qualityMultiplier
+ More pixels = more data to compress.
+ Larger resolutions need proportionally more bitrate to maintain quality.
+ 
+ */
+enum VideoBitrate {
+    case low        /// ~2 Mbps per Megapixel
     case medium     /// ~8 Mbps/MP
     case high       /// ~20 Mbps/MP
-    case maximum    /// ~50 Mbps/MP
+    case veryHigh   /// ~50 Mbps/MP
     
-    func bitrate(for size: CGSize) -> Int {
+    
+    func calculate(for size: CGSize) -> Int {
         let megapixels = (size.width * size.height) / 1_000_000
         let multiplier: Double
         
@@ -32,24 +40,27 @@ enum VideoQuality {
         case .low: multiplier = 2_000_000
         case .medium: multiplier = 8_000_000
         case .high: multiplier = 20_000_000
-        case .maximum: multiplier = 50_000_000
+        case .veryHigh: multiplier = 50_000_000
         }
         
         return Int(megapixels * multiplier)
     }
 }
 
-class SKVideoWriter {
+class VideoWriter {
     
     // MARK: Properties
+    
+    let videoURL: URL
     
     private let assetWriter: AVAssetWriter
     private let writerInput: AVAssetWriterInput
     private let pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor
     private let fps: Int
-    let videoURL: URL
     
-    init(url: URL, size: CGSize, fps: Int, quality: VideoQuality) throws {
+    // MARK: Init
+    
+    init(url: URL, size: CGSize, fps: Int, bitrate: VideoBitrate) throws {
         self.videoURL = url
         self.fps = fps
         
@@ -60,7 +71,6 @@ class SKVideoWriter {
         assetWriter = try AVAssetWriter(outputURL: url, fileType: .mp4)
         
         /// Configure video encoding settings
-        /// Higher bitrate = better quality, larger file size
         let videoSettings: [String: Any] = [
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: Int(size.width),
@@ -87,7 +97,7 @@ class SKVideoWriter {
              
              ## sRGB Transfer Function
              
-             This setting is the closest, but still does not match SKView
+             This setting is the closest to SKView's colors.
              
              AVVideoColorPropertiesKey: [
                  AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
@@ -96,13 +106,14 @@ class SKVideoWriter {
              ]
              
              */
-//            AVVideoColorPropertiesKey: [
-//                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
-//                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
-//                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
-//            ],
+            AVVideoColorPropertiesKey: [
+                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+                AVVideoTransferFunctionKey: AVVideoTransferFunction_IEC_sRGB,
+                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
+            ],
             AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: quality.bitrate(for: size),
+                /// Higher bitrate = better quality, larger file size
+                AVVideoAverageBitRateKey: bitrate.calculate(for: size),
                 AVVideoExpectedSourceFrameRateKey: fps,
                 AVVideoMaxKeyFrameIntervalKey: fps,
                 /// Disable B-frames for faster encoding (offline rendering doesn't need them)
@@ -123,7 +134,7 @@ class SKVideoWriter {
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
             kCVPixelBufferWidthKey as String: Int(size.width),
             kCVPixelBufferHeightKey as String: Int(size.height),
-            kCVPixelBufferMetalCompatibilityKey as String: true
+            kCVPixelBufferMetalCompatibilityKey as String: true,
         ]
         
         pixelBufferAdaptor = AVAssetWriterInputPixelBufferAdaptor(
@@ -139,6 +150,8 @@ class SKVideoWriter {
         assetWriter.startWriting()
         assetWriter.startSession(atSourceTime: .zero)
     }
+    
+    // MARK: Append
    
     /// Append a single frame from IOSurface to the video
     /// Frame index determines presentation time (frameIndex / fps)
@@ -202,6 +215,8 @@ class SKVideoWriter {
             throw RenderError.failedToAppendFrame
         }
     }
+    
+    // MARK: Finish
     
     /// Finalize the video file
     /// Returns the final video URL on success
