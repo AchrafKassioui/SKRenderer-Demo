@@ -6,7 +6,7 @@
  
  Achraf Kassioui
  Created 26 Nov 2025
- Updated 5 Jan 2026
+ Updated 13 Jan 2026
  
  */
 import SpriteKit
@@ -309,7 +309,7 @@ func convertToCGImage(_ texture: MTLTexture) throws -> CGImage {
         bitsPerComponent: 8,
         bitsPerPixel: 32,
         bytesPerRow: rowBytes,
-        space: CGColorSpace(name: CGColorSpace.sRGB)!,
+        space: CGColorSpace(name: CGColorSpace.sRGB)!, /// Color space for image export
         bitmapInfo: bitmapInfo,
         provider: dataProvider,
         decode: nil,

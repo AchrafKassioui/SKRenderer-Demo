@@ -185,9 +185,10 @@ This time setup is called "monotonically increasing", i.e. the current time is p
 
 A delta time is subtracted every frame:
 - Actions with duration or delay > 0 are not ran
-- Particles don't spawn
+- Particles spawn but do not animate
 - Physics bodies don't run
 - Physics fields don't run
+- The update function is called only twice
 
 ### Frozen
 

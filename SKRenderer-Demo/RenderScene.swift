@@ -2,14 +2,16 @@
  
  ## Scene
  
- The SpriteKit scene used for SKView and offline rendering with SKRenderer.
+ The SpriteKit content used for SKView and offline rendering with SKRenderer.
+ Core Image filters applied to the scene are defined here.
  
  Achraf Kassioui
  Created 26 Nov 2025
- Updated 12 Jan 2026
+ Updated 13 Jan 2026
  
  */
 import SpriteKit
+import CoreImage.CIFilterBuiltins
 
 // MARK: Image Filters
 
@@ -286,21 +288,11 @@ class RenderScene: SKScene, SKPhysicsContactDelegate {
         /// Store for next frame
         lastUpdateTime = currentTime
         
-        /// During offline rendering, even if we supply a fixed timestep, we get alternating
-        /// delta time values because we are adding 1/60 each time (floating point precision)
+        /// Log delta times during offline rendering to see how stable the simulation time is
+        /// Test with various time progression modes
         if isOffscreen {
             //print(deltaTime)
         }
-        /*
-         0.016666666720993817
-         0.016666666604578495
-         0.016666666720993817
-         0.016666666604578495
-         0.016666666720993817
-         0.016666666720993817
-         0.016666666604578495
-         0.016666666720993817
-         */
     }
     
 }

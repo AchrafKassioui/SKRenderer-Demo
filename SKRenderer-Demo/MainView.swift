@@ -2,7 +2,7 @@
  
  # View + Controller
  
- The overall structure of the app is as follows:
+ The overall structure of the app:
  
  - MainView: the app interface with SKView and render controls
  - SKRenderController: orchestrates rendering, manages progress, and handles file I/O
@@ -10,18 +10,13 @@
  - SKOfflineRenderer: wraps SKRenderer, manages Metal textures and IOSurface, and converts to PNG
  - VideoWriter: encodes rendered frames to H.264 video via AVAssetWriter
  
- ## Todo
- 
- - Export frames should take a number of frames to export + fps or delta time.
- 
  Achraf Kassioui
  Created 20 Nov 2025
- Updated 6 Jan 2026
+ Updated 13 Jan 2026
  
  */
 import SpriteKit
 import SwiftUI
-import CoreImage.CIFilterBuiltins
 
 enum OutputFormat: String, Identifiable, CaseIterable {
     case video = "Video"

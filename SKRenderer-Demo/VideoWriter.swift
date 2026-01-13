@@ -12,7 +12,7 @@
  
  Achraf Kassioui
  Created 3 Jan 2026
- Updated 5 Jan 2026
+ Updated 13 Jan 2026
  
  */
 import AVFoundation
@@ -77,7 +77,7 @@ class VideoWriter {
             AVVideoHeightKey: Int(size.height),
             /**
              
-             # Color Settings
+             # Color Space
              
              ## sRGB
              
@@ -112,7 +112,6 @@ class VideoWriter {
                 AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
             ],
             AVVideoCompressionPropertiesKey: [
-                /// Higher bitrate = better quality, larger file size
                 AVVideoAverageBitRateKey: bitrate.calculate(for: size),
                 AVVideoExpectedSourceFrameRateKey: fps,
                 AVVideoMaxKeyFrameIntervalKey: fps,
