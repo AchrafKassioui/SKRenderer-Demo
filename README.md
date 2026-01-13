@@ -232,8 +232,6 @@ SKRenderer can be used to record a SpriteKit simulation. We can export the scene
 
 ### Export to PNG
 
-The pipeline to export to a sequence of images is as follows:
-
 - A fresh instance of the scene is passed to SKRenderer
 - SKRenderer updates and renders each frame to a Metal render texture
 - The render texture is copied with `texture.getBytes()` to raw pixel data
@@ -243,16 +241,14 @@ The `getBytes()` method is convenient, but slow for high performance needs. For 
 
 ### Export to Video
 
-The pipeline to export to a video is as follows:
-
-- A fresh instance of the scene is passed to SKRenderer.
-- SKRenderer updates and renders each frame to a Metal render texture.
+- A fresh instance of the scene is passed to SKRenderer
+- SKRenderer updates and renders each frame to a Metal render texture
 - The render texture is blit (fast GPU copy) to an IOSurface-backed texture
 - The video writer transfers (memcpy) the IOSurface to CVPixelBuffer
 - AVAssetWriter encodes the pixel buffer to H.264
 - After all frames are encoded, AVAssetWriter finalizes the video file
 
-Video export uses IOSurface, which is a low level memory management framework. IOSurface provides memory that both GPU and CPU can access quickly.
+Video export uses [IOSurface](https://developer.apple.com/documentation/iosurface), which is a low level memory management framework. IOSurface provides memory that both GPU and CPU can access quickly.
 
 The blit is fast. The memcpy from IOSurface to CVPixelBuffer is faster than getBytes() from a Metal texture. Compared to PNG's getBytes(): this pipeline reduces per-frame overhead from ~5ms to <1ms on iPhone 13 at 1080p.
 
