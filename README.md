@@ -1,9 +1,4 @@
 # SKRenderer Demo
-*Published 5 Nov 2025*
-*Updated 12 Jan 2026*
-
-## Introduction
-
 <img src="SKRenderer-Demo/Images/SKRenderer-Demo-Screenshot-3.png" alt="SKRenderer-Demo-Screenshot" style="width:33%;" />
 
 This app demonstrates:
@@ -306,3 +301,8 @@ I found the following to not be deterministic, despite the fixed time step suppl
 - Colliding physics bodies. We can see that the bouncing balls above are in different positions at similar simulation time.
 
 If your setup depends on precise physics body positions interacting over multiple seconds, use guide rails to direct the behavior, such as careful level design and checkpoints.
+
+---
+
+*Published 5 Nov 2025*
+*Updated 12 Jan 2026*
