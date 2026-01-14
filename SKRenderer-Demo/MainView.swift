@@ -12,7 +12,7 @@
  
  Achraf Kassioui
  Created 20 Nov 2025
- Updated 13 Jan 2026
+ Updated 14 Jan 2026
  
  */
 import SpriteKit
@@ -366,7 +366,7 @@ class SKRenderController {
             
             /// Always start from CACurrentMediaTime()
             /// Particles are not rendered if time values start at 0
-            var sceneTime: TimeInterval = 0 + CACurrentMediaTime()
+            var currentTime: TimeInterval = 0 + CACurrentMediaTime()
             let deltaTime = 1.0 / fps
             var lastPrintedPercent = 0
             
@@ -378,19 +378,19 @@ class SKRenderController {
                 /// Update time test: apply different time progression modes
                 switch currentTimeMode {
                 case .frozen:
-                    sceneTime += 0
+                    currentTime += 0
                 case .backwards:
-                    sceneTime -= deltaTime
+                    currentTime -= deltaTime
                 case .normal:
-                    sceneTime += deltaTime
+                    currentTime += deltaTime
                 case .doubleSpeed:
-                    sceneTime += deltaTime * 2
+                    currentTime += deltaTime * 2
                 case .slowMotion:
-                    sceneTime += deltaTime / 4
+                    currentTime += deltaTime / 4
                 }
                 
                 /// Render to IOSurface
-                try await offlineRenderer.renderToIOSurface(atTime: sceneTime)
+                try await offlineRenderer.renderToIOSurface(atTime: currentTime)
                 
                 /// Encode frame
                 try videoWriter.appendFrame(from: ioSurface, frameIndex: frame)
@@ -484,8 +484,8 @@ class SKRenderController {
             print()
             
             /// Update time
-            let deltaTime = 1.0 / fps
             var currentTime: TimeInterval = 0 + CACurrentMediaTime()
+            let deltaTime = 1.0 / fps
             var lastPrintedPercent = 0
             
             /// Track parallel save operations for logging
