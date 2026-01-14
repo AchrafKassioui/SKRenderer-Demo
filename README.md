@@ -3,7 +3,7 @@
 
 This app demonstrates:
 
-- Setting up SKRenderer to render a SpriteKit scene
+- Setting up SKRenderer
 - Recording a SpriteKit scene to an image sequence
 - Recording a SpriteKit scene to video using IOSurface and AVFoundation
 - Applying Core Image filters
@@ -170,11 +170,11 @@ let squareTexture = SKTexture(image: cgRenderer.image { context in
 SpriteKit's update function takes a current time value, not a delta time. When the scene is updated with SKRenderer `update(atTime:)` method, the correct value must be passed. I found that time values must start from a `CACurrentMediaTime()` and not 0. Then, each tick, add a delta time:
 
 ```swift
-var sceneTime: TimeInterval = CACurrentMediaTime()
+var currentTime: TimeInterval = CACurrentMediaTime()
 let deltaTime = 1.0 / fps
 
 for frame in 0..<totalFrames {
-	let currentTime = sceneTime + deltaTime
+	currentTime += deltaTime
     renderer.update(atTime: currentTime)
 }
 ```
@@ -297,7 +297,7 @@ I found the following to not be deterministic, despite the fixed time step suppl
 
 - Colliding physics bodies. We can see that the bouncing balls above are in different positions at similar simulation time.
 
-If your setup depends on precise physics body positions interacting over multiple seconds, use guide rails to direct the behavior, such as careful level design and checkpoints.
+If your setup depends on precise physics body positions interacting over multiple seconds, use guide rails to direct behavior, such as careful level design and checkpoints.
 
 ---
 
