@@ -4,7 +4,7 @@ This app is an offline renderer for SpriteKit.
 
 <img src="SKRenderer-Demo/Images/SKRenderer-Demo-Screenshot-3.png" alt="SKRenderer-Demo-Screenshot" style="width:33%;" />
 
-This app demonstrates:
+The app demonstrates:
 
 - Setting up SKRenderer
 - Recording a SpriteKit scene to an image sequence
