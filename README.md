@@ -4,7 +4,7 @@ This project shows how to export Metal-rendered content to an image sequence or 
 
 <img src="Images/SKRenderer-Demo-Screenshot-3.png" alt="SKRenderer-Demo-Screenshot" style="width:33%;" />
 
-The Metal source used for this project is `SKRenderer`, which renders SpriteKit content. The demo app is an offline renderer for SpriteKit.
+The Metal source used for this project is `SKRenderer`, which renders SpriteKit content. The demo app is an offline renderer for SpriteKit. The export pipeline could be adapted to any other Metal source, such as `RealityRenderer` or a custom renderer.
 
 The project demonstrates:
 
