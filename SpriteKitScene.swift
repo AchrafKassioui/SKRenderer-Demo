@@ -70,7 +70,7 @@ struct BitMasks: OptionSet {
 
 // MARK: Scene
 
-class RenderScene: SKScene, SKPhysicsContactDelegate {
+class SpriteKitScene: SKScene, SKPhysicsContactDelegate {
     
     var imagefilter: CoreImageFilter
     private(set) var deltaTime: TimeInterval = 0

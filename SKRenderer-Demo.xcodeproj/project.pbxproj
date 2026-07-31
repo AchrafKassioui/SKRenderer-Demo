@@ -8,30 +8,34 @@
 
 /* Begin PBXBuildFile section */
 		DE7E15702ED7A29F00FDB25C /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = DE7E156F2ED7A29F00FDB25C /* README.md */; };
+		DEC81D81301C51930003C07C /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC81D78301C51930003C07C /* App.swift */; };
+		DEC81D82301C51930003C07C /* Errors.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC81D7A301C51930003C07C /* Errors.swift */; };
+		DEC81D83301C51930003C07C /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC81D7B301C51930003C07C /* Extensions.swift */; };
+		DEC81D84301C51930003C07C /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC81D7D301C51930003C07C /* MainView.swift */; };
+		DEC81D85301C51930003C07C /* SpriteKitScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC81D7E301C51930003C07C /* SpriteKitScene.swift */; };
+		DEC81D86301C51930003C07C /* OfflineRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC81D7F301C51930003C07C /* OfflineRenderer.swift */; };
+		DEC81D87301C51930003C07C /* VideoWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC81D80301C51930003C07C /* VideoWriter.swift */; };
+		DEC81D92301C51930003C07C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DEC81D79301C51930003C07C /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		DE7E155F2ED7A06100FDB25C /* SKRenderer-Demo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "SKRenderer-Demo.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE7E156F2ED7A29F00FDB25C /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		DEC81D78301C51930003C07C /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		DEC81D79301C51930003C07C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		DEC81D7A301C51930003C07C /* Errors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Errors.swift; sourceTree = "<group>"; };
+		DEC81D7B301C51930003C07C /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
+		DEC81D7C301C51930003C07C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		DEC81D7D301C51930003C07C /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
+		DEC81D7E301C51930003C07C /* SpriteKitScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpriteKitScene.swift; sourceTree = "<group>"; };
+		DEC81D7F301C51930003C07C /* OfflineRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineRenderer.swift; sourceTree = "<group>"; };
+		DEC81D80301C51930003C07C /* VideoWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoWriter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		DEE873952F0AF38C0090FB63 /* Exceptions for "SKRenderer-Demo" folder in "SKRenderer-Demo" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = DE7E155E2ED7A06100FDB25C /* SKRenderer-Demo */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		DE7E15612ED7A06100FDB25C /* SKRenderer-Demo */ = {
+		DEC81D9E301C520A0003C07C /* Images */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				DEE873952F0AF38C0090FB63 /* Exceptions for "SKRenderer-Demo" folder in "SKRenderer-Demo" target */,
-			);
-			path = "SKRenderer-Demo";
+			path = Images;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -50,7 +54,16 @@
 		DE7E15562ED7A06100FDB25C = {
 			isa = PBXGroup;
 			children = (
-				DE7E15612ED7A06100FDB25C /* SKRenderer-Demo */,
+				DEC81D9E301C520A0003C07C /* Images */,
+				DEC81D78301C51930003C07C /* App.swift */,
+				DEC81D79301C51930003C07C /* Assets.xcassets */,
+				DEC81D7A301C51930003C07C /* Errors.swift */,
+				DEC81D7B301C51930003C07C /* Extensions.swift */,
+				DEC81D7C301C51930003C07C /* Info.plist */,
+				DEC81D7D301C51930003C07C /* MainView.swift */,
+				DEC81D7E301C51930003C07C /* SpriteKitScene.swift */,
+				DEC81D7F301C51930003C07C /* OfflineRenderer.swift */,
+				DEC81D80301C51930003C07C /* VideoWriter.swift */,
 				DE7E15602ED7A06100FDB25C /* Products */,
 				DE7E156F2ED7A29F00FDB25C /* README.md */,
 			);
@@ -80,7 +93,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				DE7E15612ED7A06100FDB25C /* SKRenderer-Demo */,
+				DEC81D9E301C520A0003C07C /* Images */,
 			);
 			name = "SKRenderer-Demo";
 			packageProductDependencies = (
@@ -129,6 +142,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				DE7E15702ED7A29F00FDB25C /* README.md in Resources */,
+				DEC81D92301C51930003C07C /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -139,6 +153,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DEC81D81301C51930003C07C /* App.swift in Sources */,
+				DEC81D82301C51930003C07C /* Errors.swift in Sources */,
+				DEC81D83301C51930003C07C /* Extensions.swift in Sources */,
+				DEC81D84301C51930003C07C /* MainView.swift in Sources */,
+				DEC81D85301C51930003C07C /* SpriteKitScene.swift in Sources */,
+				DEC81D86301C51930003C07C /* OfflineRenderer.swift in Sources */,
+				DEC81D87301C51930003C07C /* VideoWriter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -280,7 +301,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "SKRenderer-Demo/Info.plist";
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = SKRendererDemo;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save rendered videos to your photo library";
@@ -331,7 +352,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "SKRenderer-Demo/Info.plist";
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = SKRendererDemo;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save rendered videos to your photo library";

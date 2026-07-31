@@ -5,9 +5,9 @@
  The overall structure of the app:
  
  - MainView: the app interface with SKView and render controls
- - SKRenderController: orchestrates rendering, manages progress, and handles file I/O
- - SKRenderScene: the SpriteKit content
- - SKOfflineRenderer: wraps SKRenderer, manages Metal textures and IOSurface, and converts to PNG
+ - RenderController: orchestrates rendering, manages progress, and handles file I/O
+ - SpriteKitScene: the SpriteKit content
+ - OfflineRenderer: wraps SKRenderer, manages Metal textures and IOSurface, and converts to PNG
  - VideoWriter: encodes rendered frames to H.264 video via AVAssetWriter
  
  Achraf Kassioui
@@ -54,8 +54,8 @@ struct MainView: View {
     
     // MARK: State
     
-    @State private var liveScene: RenderScene?
-    @State private var controller = SKRenderController()
+    @State private var liveScene: SpriteKitScene?
+    @State private var controller = RenderController()
     
     @State private var renderDuration: TimeInterval = 5
     @State private var renderFPS: CGFloat = 60
@@ -227,7 +227,7 @@ struct MainView: View {
                 .padding(.bottom, max(geometry.safeAreaInsets.bottom, 20))
             }
             .onAppear {
-                liveScene = RenderScene(size: geometry.size, scaleFactor: scaleFactor, imageFilter: imageFilter)
+                liveScene = SpriteKitScene(size: geometry.size, scaleFactor: scaleFactor, imageFilter: imageFilter)
             }
         }
         .ignoresSafeArea()
@@ -274,10 +274,10 @@ struct ShareSheet: UIViewControllerRepresentable {
     MainView()
 }
 
-// MARK: Controller
+// MARK: Render Controller
 
 @Observable
-class SKRenderController {
+class RenderController {
     
     var isRendering = false
     var progress: Double = 0
@@ -331,7 +331,7 @@ class SKRenderController {
             let videoURL = documentDirectory.appendingPathComponent(filename)
             
             /// Create renderer with IOSurface
-            let offlineRenderer = try SKOfflineRenderer(
+            let offlineRenderer = try OfflineRenderer(
                 size: size,
                 renderScale: renderScale,
                 imageFilter: imageFilter,
@@ -462,7 +462,7 @@ class SKRenderController {
         
         do {
             /// Create renderer once, reused for all frames
-            let offlineRenderer = try SKOfflineRenderer(
+            let offlineRenderer = try OfflineRenderer(
                 size: size,
                 renderScale: renderScale,
                 imageFilter: imageFilter,

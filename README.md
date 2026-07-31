@@ -1,25 +1,29 @@
 # SKRenderer Demo
 
-This app is an offline renderer for SpriteKit.
+<img src="Images/SKRenderer-Demo-Screenshot-3.png" alt="SKRenderer-Demo-Screenshot" style="width:33%;" />
 
-<img src="SKRenderer-Demo/Images/SKRenderer-Demo-Screenshot-3.png" alt="SKRenderer-Demo-Screenshot" style="width:33%;" />
+This project shows how to export Metal-rendered content to an image sequence or H.264 video.
 
-The app demonstrates:
+The Metal source used for this project is `SKRenderer`, which is SpriteKit renderer. The demo app is an offline renderer for SpriteKit.
 
-- Setting up SKRenderer
-- Recording a SpriteKit scene to an image sequence
-- Recording a SpriteKit scene to video using IOSurface and AVFoundation
-- Applying Core Image filters
-- Exploring SpriteKit's update timing, physics engine clock, and determinism
+The project demonstrates:
+
+- Setting up SKRenderer.
+- Applying Core Image filters to SpriteKit content.
+- Rendering into an offscreen Metal texture.
+- Exporting Metal textures as a PNG image sequence.
+- Exporting Metal textures to H.264 video using IOSurface and AVFoundation.
+
+The project also explores SpriteKit's update timing, physics clock, and determinism.
 
 ## Usage
 
-The app runs in Xcode Live Preview, Simulator, iOS device, and Mac Catalyst. Use the controls to adjust render settings.
+The demo app runs in Xcode Live Preview, Simulator, iOS, and Mac Catalyst.
 
 When rendering starts, the live SKView is paused to free resources for the offline renderer. When rendering completes:
 
-- Mac/Simulator/Live Preview: the file path is printed to the Xcode console
-- iOS Device: a share sheet appears to save or share the file
+- On Mac/Simulator/Live Preview: the file path is printed to the Xcode console.
+- On iOS: a share sheet appears to save or share the file.
 
 ### Render to Video
 
@@ -252,7 +256,7 @@ The `getBytes()` method is convenient, but slow for high performance needs. For 
 - AVAssetWriter encodes the pixel buffer to H.264
 - After all frames are encoded, AVAssetWriter finalizes the video file
 
-Video export uses [IOSurface](https://developer.apple.com/documentation/iosurface), which is a low level memory management framework. IOSurface provides memory that both GPU and CPU can access quickly.
+Video export uses [IOSurface](https://developer.apple.com/documentation/iosurface), which is a low-level memory management framework. IOSurface provides memory that both GPU and CPU can access quickly.
 
 The blit is fast. The memcpy from IOSurface to CVPixelBuffer is faster than getBytes() from a Metal texture. Compared to PNG's getBytes(): this pipeline reduces per-frame overhead from ~5ms to <1ms on iPhone 13 at 1080p.
 
@@ -288,7 +292,7 @@ This enables capturing complex simulations at any resolution and frame rate, ful
 
 Interaction and behavior must be deterministic for frame-perfect replay. Consider the figure below: each render is from the same scene, and each image is the 500th frame of a 10 seconds simulation.
 
-<img src="SKRenderer-Demo/Images/SKRenderer-determinism.png" alt="SKRenderer-determinism" style="width:50%;" />
+<img src="Images/SKRenderer-determinism.png" alt="SKRenderer-determinism" style="width:50%;" />
 
 From empirical testing, I found the following to be deterministic:
 
@@ -305,4 +309,4 @@ If your setup depends on precise physics body positions interacting over multipl
 ---
 
 *Published 5 Nov 2025*  
-*Updated 14 Jan 2026*
+*Updated 31 Jul 2026*

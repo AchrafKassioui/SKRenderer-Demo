@@ -11,11 +11,11 @@
  */
 import SpriteKit
 
-class SKOfflineRenderer {
+class OfflineRenderer {
     
     // MARK: Properties
     
-    let renderer: SKRenderer
+    let skRenderer: SKRenderer
     private let sceneSize: CGSize
     private let backgroundColor: MTLClearColor
     
@@ -80,9 +80,9 @@ class SKOfflineRenderer {
         /// Create SKRenderer and scene
         /// Scene size is in points
         /// SKRenderer automatically maps viewport (points) to texture (pixels) at the correct scale
-        renderer = SKRenderer(device: device)
-        let scene = RenderScene(size: size, scaleFactor: renderScale, imageFilter: imageFilter)
-        renderer.scene = scene
+        skRenderer = SKRenderer(device: device)
+        let scene = SpriteKitScene(size: size, scaleFactor: renderScale, imageFilter: imageFilter)
+        skRenderer.scene = scene
         
         self.backgroundColor = scene.backgroundColor.metalClearColor
         
@@ -145,7 +145,8 @@ class SKOfflineRenderer {
         }
         
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            renderer.update(atTime: time)
+            /// Run all SKScene update callbacks
+            skRenderer.update(atTime: time)
             
             /// Set render texture
             let renderPassDescriptor = MTLRenderPassDescriptor()
@@ -173,7 +174,7 @@ class SKOfflineRenderer {
             
             /// Render scene into texture
             let viewport = CGRect(origin: .zero, size: sceneSize)
-            renderer.render(
+            skRenderer.render(
                 withViewport: viewport,
                 commandBuffer: commandBuffer,
                 renderPassDescriptor: renderPassDescriptor
@@ -213,7 +214,8 @@ class SKOfflineRenderer {
     func renderToCGImage(atTime time: TimeInterval) async throws -> CGImage {
         /// withCheckedThrowingContinuation bridges Metal's callback-based API to async/await
         try await withCheckedThrowingContinuation { continuation in
-            renderer.update(atTime: time)
+            /// Run all SKScene update callbacks
+            skRenderer.update(atTime: time)
             
             /// Configure render pass descriptor
             let renderPassDescriptor = MTLRenderPassDescriptor()
@@ -242,7 +244,7 @@ class SKOfflineRenderer {
             /// Render scene into texture
             /// Metal automatically handles the scale factor mapping
             let viewport = CGRect(origin: .zero, size: sceneSize) /// viewport values appear to be ignored
-            renderer.render(
+            skRenderer.render(
                 withViewport: viewport,
                 commandBuffer: commandBuffer,
                 renderPassDescriptor: renderPassDescriptor
