@@ -1,10 +1,10 @@
 # SKRenderer Demo
 
-<img src="Images/SKRenderer-Demo-Screenshot-3.png" alt="SKRenderer-Demo-Screenshot" style="width:33%;" />
-
 This project shows how to export Metal-rendered content to an image sequence or H.264 video.
 
-The Metal source used for this project is `SKRenderer`, which is SpriteKit renderer. The demo app is an offline renderer for SpriteKit.
+<img src="Images/SKRenderer-Demo-Screenshot-3.png" alt="SKRenderer-Demo-Screenshot" style="width:33%;" />
+
+The Metal source used for this project is `SKRenderer`, which renders SpriteKit content. The demo app is an offline renderer for SpriteKit.
 
 The project demonstrates:
 
