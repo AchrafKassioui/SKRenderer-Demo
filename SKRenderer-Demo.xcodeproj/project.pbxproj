@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		DE29DA17301D38A9002A2BB5 /* NOTICE.txt in Resources */ = {isa = PBXBuildFile; fileRef = DE29DA16301D38A9002A2BB5 /* NOTICE.txt */; };
+		DE29DA18301D38A9002A2BB5 /* LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = DE29DA15301D38A9002A2BB5 /* LICENSE.txt */; };
 		DE7E15702ED7A29F00FDB25C /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = DE7E156F2ED7A29F00FDB25C /* README.md */; };
 		DEC81D81301C51930003C07C /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC81D78301C51930003C07C /* App.swift */; };
 		DEC81D82301C51930003C07C /* Errors.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC81D7A301C51930003C07C /* Errors.swift */; };
@@ -19,6 +21,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		DE29DA15301D38A9002A2BB5 /* LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE.txt; sourceTree = "<group>"; };
+		DE29DA16301D38A9002A2BB5 /* NOTICE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = NOTICE.txt; sourceTree = "<group>"; };
 		DE7E155F2ED7A06100FDB25C /* SKRenderer-Demo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "SKRenderer-Demo.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE7E156F2ED7A29F00FDB25C /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		DEC81D78301C51930003C07C /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
@@ -54,6 +58,8 @@
 		DE7E15562ED7A06100FDB25C = {
 			isa = PBXGroup;
 			children = (
+				DE29DA15301D38A9002A2BB5 /* LICENSE.txt */,
+				DE29DA16301D38A9002A2BB5 /* NOTICE.txt */,
 				DEC81D9E301C520A0003C07C /* Images */,
 				DEC81D78301C51930003C07C /* App.swift */,
 				DEC81D79301C51930003C07C /* Assets.xcassets */,
@@ -143,6 +149,8 @@
 			files = (
 				DE7E15702ED7A29F00FDB25C /* README.md in Resources */,
 				DEC81D92301C51930003C07C /* Assets.xcassets in Resources */,
+				DE29DA17301D38A9002A2BB5 /* NOTICE.txt in Resources */,
+				DE29DA18301D38A9002A2BB5 /* LICENSE.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1,0 +1,5 @@
+SKRenderer-Demo
+Copyright 2025 Achraf Kassioui
+
+This project was created by Achraf Kassioui.
+Project page: https://github.com/AchrafKassioui/SKRenderer-Demo

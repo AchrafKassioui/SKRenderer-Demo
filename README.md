@@ -306,6 +306,13 @@ I found the following to not be deterministic, despite the fixed time step suppl
 
 If your setup depends on precise physics body positions interacting over multiple seconds, use guide rails to direct behavior, such as careful level design and checkpoints.
 
+## License
+
+This project is licensed under the Apache License 2.0.
+
+If this project helps your work, attribution or a link back is appreciated:
+https://www.achrafkassioui.com
+
 ---
 
 *Published 5 Nov 2025*  
