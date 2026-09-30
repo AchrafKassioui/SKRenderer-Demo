@@ -38,6 +38,7 @@
       ignoresPersistentStateOnLaunch = "NO"
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
+      enableGPUValidationMode = "1"
       allowLocationSimulation = "YES"
       queueDebuggingEnabled = "No">
       <BuildableProductRunnable
@@ -49,6 +50,9 @@
             ReferencedContainer = "container:SKRenderer-Demo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <MetalAPIValidationSettings
+         isEnabled = "No">
+      </MetalAPIValidationSettings>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
